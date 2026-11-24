@@ -1,0 +1,30 @@
+{
+  "name": "frame-os",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Frame OS — Personal Life OS поверх Obsidian Vault",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c blue,magenta \"npm run dev -w @frame-os/server\" \"npm run dev -w @frame-os/web\"",
+    "build": "npm run build -w @frame-os/web",
+    "start": "npm run start -w @frame-os/server",
+    "sample-vault": "node scripts/sample-vault.mjs",
+    "test": "vitest run",
+    "test:e2e": "node scripts/e2e.mjs",
+    "typecheck": "tsc -p packages/vault --noEmit && tsc -p apps/server --noEmit && tsc -p apps/web --noEmit",
+    "check": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "concurrently": "^9.2.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
