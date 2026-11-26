@@ -1,6 +1,6 @@
-# @frame-os/todoist
+# Модуль Todoist (`@frame-os/todoist`)
 
-Модуль Frame OS для двусторонней синхронизации с Todoist (API v1: `https://api.todoist.com/api/v1`; старые REST v2 и Sync v9 Doist уже отключил).
+Модуль Frame OS для двусторонней синхронизации с Todoist. Работает с Todoist API версии 1 (`https://api.todoist.com/api/v1`): прежние версии API Todoist уже отключены.
 
 Todoist отвечает на вопрос «что сделать». Модуль держит локальную копию задач, чтобы Frame OS работал и без сети, и связывает задачи с заметками Obsidian (`obsidianPath` и ссылка `obsidian://` в описании задачи).
 
@@ -9,13 +9,13 @@ Todoist отвечает на вопрос «что сделать». Модул
 - Задачи: просмотр, создание, изменение, завершение, повторное открытие, перенос в другой проект/раздел, удаление (только с `confirmed: true`).
 - Сроки: текстом (`due_string`: «завтра», `every monday`, `каждый понедельник` + `due_lang: "ru"`), датой (`due_date`), датой со временем (`due_datetime`), снятие срока (`clearDue`), дедлайн (`deadline_date`).
 - Повторяющиеся задачи: при завершении не помечаются выполненными, а переходят на следующую дату, как в Todoist.
-- Проекты, разделы, метки; Quick Add (`quickAdd("Купить молоко завтра #Дом p1")`).
+- Проекты, разделы, метки; быстрое добавление в синтаксисе Todoist (`quickAdd("Купить молоко завтра #Дом p1")`).
 - Представления: `today`, `overdue`, `upcoming`, `backlog` (без даты), `completed`, `all`, плюс фильтр по проекту, метке и поиск. «Сегодня» считается в заданном часовом поясе.
-- Backlog → Todoist: `sendBacklogItem(item, { projectId, due_string })`.
+- Из бэклога в Todoist: `sendBacklogItem(item, { projectId, due_string })`.
 
 ## Синхронизация
 
-1. Каждое изменение сразу применяется к локальной копии и попадает в очередь (outbox), затем отправляется в Todoist.
+1. Каждое изменение сразу применяется к локальной копии и попадает в очередь отправки, затем отправляется в Todoist.
 2. Нет сети, Todoist недоступен или лимит запросов: изменения остаются в очереди и уходят при следующей синхронизации в том же порядке.
 3. `sync()` сначала забирает изменения из Todoist, потом отправляет очередь.
 4. Задача изменена и тут, и в Todoist: статус `conflict`, обе версии сохранены, выбор через `resolveConflict(id, "local" | "remote")`.
@@ -33,7 +33,7 @@ Todoist отвечает на вопрос «что сделать». Модул
 
 ## API-токен
 
-Токен берётся в таком порядке и никогда не попадает в репозиторий, vault, кэш или логи (он вырезается даже из текста ошибок Todoist):
+Токен берётся в таком порядке и никогда не попадает в репозиторий, хранилище Obsidian, кэш или журналы (он вырезается даже из текста ошибок Todoist):
 
 1. Переменная окружения `TODOIST_API_TOKEN` (например, из `.env`, который в `.gitignore`).
 2. Файл из `TODOIST_API_TOKEN_FILE` с правами только для владельца (`chmod 600`; файл с более широкими правами отклоняется).
@@ -47,23 +47,21 @@ Todoist отвечает на вопрос «что сделать». Модул
 
 Проверить подключение (только чтение, ничего не меняет): `npm run check:todoist`.
 
-## HTTP API
+## Подключение к серверу
 
-`createNodeHandler(service)` подключается к любому `node:http` серверу, `handleTodoistApi(service, req)` к любому фреймворку. Все маршруты под `/api/todoist`, полный список в начале `src/http.ts`. Удаление без `{ "confirmed": true }` возвращает 428.
+В Frame OS модуль подключён в `apps/server/src/todoist.ts`: маршруты `/api/todoist/*` (полный список в начале `src/http.ts`), статус в `/api/health` и в Настройках, автосинхронизация каждые 5 минут. Удаление без `{ "confirmed": true }` возвращает 428.
 
-```ts
-import { createTodoistService, createNodeHandler } from "@frame-os/todoist";
+Дополнительный маршрут сервера `POST /api/todoist/backlog/send-vault-task` отправляет строку задачи из заметки в Todoist и ставит в ней метку `[todoist:: id]`. После каждой синхронизации выполнение сверяется в обе стороны: закрыли в Todoist — строка в Obsidian отмечается `✅`, отметили в Obsidian — задача закрывается в Todoist.
 
-const { service } = await createTodoistService({ dataDir: ".frame-os", vaultName: "Life", timeZone: "Europe/Moscow" });
-const todoist = createNodeHandler(service);
-service.startAutoSync(5 * 60_000);
-// в обработчике сервера: if (await todoist(req, res)) return;
-```
+Для других серверов есть `createNodeHandler(service)` (для `node:http`) и `handleTodoistApi(service, req)` (для любого фреймворка).
 
 ## Разработка
 
+Команды запускаются из корня репозитория:
+
 ```bash
 npm install
-npm test          # vitest, Todoist полностью замокан (test/fake-todoist.ts), сеть не нужна
+npm test             # все тесты; Todoist полностью подменён (test/fake-todoist.ts), сеть не нужна
 npm run typecheck
+npm run check:todoist  # проверка настоящего ключа, только чтение
 ```

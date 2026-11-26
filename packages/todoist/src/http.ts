@@ -35,6 +35,7 @@ export interface ApiResponse {
 
 const VIEWS = new Set<TaskView>(["today", "overdue", "upcoming", "backlog", "completed", "all"]);
 const PREFIX = "/api/todoist";
+const LOCAL_CODES = new Set(["validation", "not_found", "confirmation_required"]);
 
 export async function handleTodoistApi(svc: TodoistSyncService, req: ApiRequest): Promise<ApiResponse | null> {
   if (!req.path.startsWith(PREFIX)) return null;
@@ -50,7 +51,7 @@ export async function handleTodoistApi(svc: TodoistSyncService, req: ApiRequest)
     if (a === "projects" && m === "GET" && !id) return ok(await svc.listProjects());
 
     if (a === "backlog" && id === "send" && m === "POST") {
-      if (!body.item?.title) throw new TodoistError("validation", "item.title is required");
+      if (!body.item?.title) throw new TodoistError("validation", "Не указано название задачи (item.title)");
       return created(await svc.sendBacklogItem(body.item, body.target ?? {}));
     }
 
@@ -58,7 +59,7 @@ export async function handleTodoistApi(svc: TodoistSyncService, req: ApiRequest)
       if (!id) {
         if (m === "GET") {
           const view = (q.get("view") ?? "all") as TaskView;
-          if (!VIEWS.has(view)) throw new TodoistError("validation", `Unknown view "${view}"`);
+          if (!VIEWS.has(view)) throw new TodoistError("validation", `Неизвестный список задач: ${view}`);
           return ok(
             await svc.listTasks({
               view,
@@ -76,7 +77,7 @@ export async function handleTodoistApi(svc: TodoistSyncService, req: ApiRequest)
       } else if (!action) {
         if (m === "GET") {
           const t = await svc.getTask(id);
-          if (!t) throw new TodoistError("not_found", "Task not found");
+          if (!t) throw new TodoistError("not_found", "Задача не найдена");
           return ok(t);
         }
         if (m === "PATCH") return ok(await svc.updateTask(id, body));
@@ -91,13 +92,13 @@ export async function handleTodoistApi(svc: TodoistSyncService, req: ApiRequest)
         if (action === "retry") return ok(await svc.retryTask(id));
         if (action === "resolve") {
           if (body.keep !== "local" && body.keep !== "remote") {
-            throw new TodoistError("validation", 'keep must be "local" or "remote"');
+            throw new TodoistError("validation", 'Укажите, какую версию оставить: keep = "local" или "remote"');
           }
           return ok(await svc.resolveConflict(id, body.keep));
         }
       }
     }
-    return { status: 404, body: { error: { code: "route_not_found", message: `${m} ${req.path}` } } };
+    return { status: 404, body: { error: { code: "route_not_found", message: `Нет такого метода API: ${m} ${req.path}` } } };
   } catch (err) {
     return errorResponse(err);
   }
@@ -119,7 +120,13 @@ export function errorResponse(err: unknown): ApiResponse {
   };
   return {
     status: status[e.code] ?? 500,
-    body: { error: { ...e.toJSON(), userMessage: USER_MESSAGES[e.code] } },
+    body: {
+      error: {
+        ...e.toJSON(),
+        // Проверки на нашей стороне дают точный текст; ответы Todoist — общий понятный.
+        userMessage: e.status === undefined && LOCAL_CODES.has(e.code) ? e.message : USER_MESSAGES[e.code],
+      },
+    },
   };
 }
 
@@ -132,7 +139,7 @@ export function createNodeHandler(svc: TodoistSyncService) {
     try {
       body = await readJson(req);
     } catch {
-      send(res, { status: 400, body: { error: { code: "validation", message: "Invalid JSON body" } } });
+      send(res, { status: 400, body: { error: { code: "validation", message: "Некорректный JSON в запросе" } } });
       return true;
     }
     const out = (await handleTodoistApi(svc, {

@@ -21,21 +21,21 @@ import { TYPE_LABEL, noteHref, useTheme, useToast, fmtDate } from './ui.tsx';
 
 const NAV = [
   { to: '/', label: 'Главная', icon: Home, end: true },
-  { to: '/today', label: 'Today', icon: CalendarDays },
-  { to: '/strategy', label: 'Strategy', icon: Target },
-  { to: '/projects', label: 'Projects', icon: FolderKanban },
-  { to: '/backlog', label: 'Backlog', icon: Inbox, badge: 'backlog' as const },
-  { to: '/ideas', label: 'Ideas', icon: Lightbulb, badge: 'ideas' as const },
+  { to: '/today', label: 'Сегодня', icon: CalendarDays },
+  { to: '/strategy', label: 'Стратегия', icon: Target },
+  { to: '/projects', label: 'Проекты', icon: FolderKanban },
+  { to: '/backlog', label: 'Бэклог', icon: Inbox, badge: 'backlog' as const },
+  { to: '/ideas', label: 'Идеи', icon: Lightbulb, badge: 'ideas' as const },
 ];
 
 const TITLES: Record<string, string> = {
   '/': 'Главная',
-  '/today': 'Today',
-  '/strategy': 'Strategy',
-  '/projects': 'Projects',
+  '/today': 'Сегодня',
+  '/strategy': 'Стратегия',
+  '/projects': 'Проекты',
   '/projects/view': 'Проект',
-  '/backlog': 'Backlog',
-  '/ideas': 'Ideas',
+  '/backlog': 'Бэклог',
+  '/ideas': 'Идеи',
   '/note': 'Заметка',
   '/favorites': 'Избранное',
   '/settings': 'Настройки',
@@ -103,7 +103,7 @@ export function Layout() {
             <div className="crumb">
               <span className="dot" /> Frame OS
               <span className={`sync ${live ? '' : 'off'}`} title={live ? 'Изменения из Obsidian подхватываются автоматически' : 'Нет связи с сервером'}>
-                <i /> {live ? 'Vault синхронизирован' : 'нет связи'}
+                <i /> {live ? 'хранилище синхронизировано' : 'нет связи'}
               </span>
             </div>
             <h1 className="page-title">{title}</h1>
@@ -112,7 +112,7 @@ export function Layout() {
             <div className="top-actions">
               <button className="search-trigger" onClick={() => setSearchOpen(true)} aria-label="Поиск">
                 <Search size={16} />
-                <span>Поиск по Vault</span>
+                <span>Поиск по заметкам</span>
                 <kbd>⌘K</kbd>
               </button>
               <button className="btn primary" onClick={() => setQuickOpen(true)}>
@@ -255,7 +255,7 @@ function SearchPalette({ onClose }: { onClose: () => void }) {
       </div>
       {!debounced && items.length === 0 && (
         <div className="empty">
-          <div className="t">Полнотекстовый поиск по Obsidian Vault</div>
+          <div className="t">Полнотекстовый поиск по хранилищу Obsidian</div>
           <div className="small">Введите слово или его начало. Избранные заметки появятся здесь.</div>
         </div>
       )}

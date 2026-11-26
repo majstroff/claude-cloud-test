@@ -54,7 +54,7 @@ export class TodoistClient {
 
   constructor(opts: TodoistClientOptions) {
     if (!opts.token || !opts.token.trim()) {
-      throw new TodoistError("not_configured", "Todoist API token is empty");
+      throw new TodoistError("not_configured", "Пустой API-токен Todoist");
     }
     this.#token = opts.token.trim();
     this.#baseUrl = (opts.baseUrl ?? TODOIST_API_URL).replace(/\/+$/, "");
@@ -97,7 +97,7 @@ export class TodoistClient {
 
   async createTask(input: CreateTaskInput) {
     assertOneDue(input);
-    if (!input.content?.trim()) throw new TodoistError("validation", "Task content is required");
+    if (!input.content?.trim()) throw new TodoistError("validation", "Название задачи не может быть пустым");
     return this.#request<TodoistTask>("POST", "/tasks", { body: compact(input) });
   }
 
@@ -126,7 +126,7 @@ export class TodoistClient {
 
   async moveTask(id: string, to: MoveTaskInput) {
     if (!to.project_id && !to.section_id && !to.parent_id) {
-      throw new TodoistError("validation", "moveTask needs project_id, section_id or parent_id");
+      throw new TodoistError("validation", "Укажите проект, раздел или родительскую задачу");
     }
     await this.#request<unknown>("POST", `/tasks/${enc(id)}/move`, { body: compact(to) });
   }
@@ -151,7 +151,7 @@ export class TodoistClient {
   }
 
   async createProject(input: CreateProjectInput) {
-    if (!input.name?.trim()) throw new TodoistError("validation", "Project name is required");
+    if (!input.name?.trim()) throw new TodoistError("validation", "Название проекта не может быть пустым");
     return this.#request<TodoistProject>("POST", "/projects", { body: compact(input) });
   }
 
@@ -175,14 +175,14 @@ export class TodoistClient {
       });
       const items = data?.[field];
       if (!Array.isArray(items)) {
-        throw new TodoistError("unexpected", `Todoist returned no "${field}" list for ${path}`);
+        throw new TodoistError("unexpected", `Todoist вернул ответ без списка «${field}» для ${path}`);
       }
       all.push(...(items as T[]));
       const next = (data as Partial<Page<T>>).next_cursor ?? null;
       if (!next || next === cursor) return all;
       cursor = next;
     }
-    throw new TodoistError("unexpected", `Too many pages for ${path}`);
+    throw new TodoistError("unexpected", `Слишком много страниц в ответе Todoist для ${path}`);
   }
 
   async #request<T>(
@@ -211,7 +211,7 @@ export class TodoistClient {
           signal: AbortSignal.timeout(this.#timeoutMs),
         });
       } catch (cause) {
-        const err = new TodoistError("network", `Network error calling Todoist ${method} ${path}`, {
+        const err = new TodoistError("network", `Нет связи с Todoist (${method} ${path})`, {
           cause: redactError(cause, this.#token),
         });
         if (attempt < this.#maxRetries) {
@@ -228,7 +228,7 @@ export class TodoistClient {
         try {
           return JSON.parse(text) as T;
         } catch {
-          throw new TodoistError("unexpected", `Todoist returned invalid JSON for ${method} ${path}`, {
+          throw new TodoistError("unexpected", `Todoist вернул некорректный ответ (${method} ${path})`, {
             status: res.status,
           });
         }
@@ -256,7 +256,7 @@ export class TodoistClient {
 }
 
 function httpError(status: number, method: string, path: string, detail: string, retryAfter?: number) {
-  const where = `Todoist ${method} ${path} → ${status}${detail ? `: ${detail}` : ""}`;
+  const where = `Todoist ответил ${status} на ${method} ${path}${detail ? `: ${detail}` : ""}`;
   if (status === 401 || status === 403) return new TodoistError("unauthorized", where, { status });
   if (status === 404) return new TodoistError("not_found", where, { status });
   if (status === 429) return new TodoistError("rate_limited", where, { status, retryAfter });
@@ -296,9 +296,9 @@ function redactError(err: unknown, token: string) {
 
 function assertOneDue(input: { due_string?: string; due_date?: string; due_datetime?: string }) {
   const n = [input.due_string, input.due_date, input.due_datetime].filter((v) => v !== undefined).length;
-  if (n > 1) throw new TodoistError("validation", "Use only one of due_string, due_date, due_datetime");
+  if (n > 1) throw new TodoistError("validation", "Укажите срок одним способом: текстом, датой или датой со временем");
   if (input.due_date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(input.due_date)) {
-    throw new TodoistError("validation", "due_date must be YYYY-MM-DD");
+    throw new TodoistError("validation", "Дата должна быть в формате ГГГГ-ММ-ДД");
   }
 }
 

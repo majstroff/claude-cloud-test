@@ -133,7 +133,7 @@ export function BacklogPage() {
         <section className="card small">
           <strong>Как разбирать бэклог</strong>
           <p className="muted" style={{ marginBottom: 0 }}>
-            Назначьте срок кнопкой календаря у задачи, и она уйдёт в <Link to="/today">Today</Link>. Если задача больше не нужна, отметьте её выполненной или
+            Назначьте срок кнопкой календаря у задачи, и она появится в разделе <Link to="/today">«Сегодня»</Link>. Если задача больше не нужна, отметьте её выполненной или
             удалите строку в Obsidian.
           </p>
           {todoistReady ? (

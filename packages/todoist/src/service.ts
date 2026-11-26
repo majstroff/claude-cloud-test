@@ -566,7 +566,7 @@ export class TodoistSyncService {
   // ---------- helpers ----------
 
   #requireClient(): TodoistClient {
-    if (!this.#client) throw new TodoistError("not_configured", "Todoist API token not found");
+    if (!this.#client) throw new TodoistError("not_configured", "API-токен Todoist не найден");
     return this.#client;
   }
 

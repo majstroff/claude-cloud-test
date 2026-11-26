@@ -16,9 +16,10 @@ try {
   }
   const client = new TodoistClient({ token: resolved.token });
   const [projects, tasks] = await Promise.all([client.listProjects(), client.listTasks()]);
-  console.log(`Todoist OK (token from ${resolved.source}): ${projects.length} projects, ${tasks.length} active tasks.`);
+  const where = { env: "переменной окружения", file: "файла", keychain: "Связки ключей" }[resolved.source];
+  console.log(`Todoist подключён (токен из ${where}): проектов ${projects.length}, активных задач ${tasks.length}.`);
 } catch (err) {
   const e = toTodoistError(err);
-  console.error(`${USER_MESSAGES[e.code]}\n(${e.code}${e.status ? `, HTTP ${e.status}` : ""})`);
+  console.error(`${USER_MESSAGES[e.code]}\n(код: ${e.code}${e.status ? `, HTTP ${e.status}` : ""})`);
   process.exit(1);
 }

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Calendar, Check, CloudOff, ExternalLink, FileText, Flag, RefreshCw, Repeat, Send } from 'lucide-react';
 import { ApiError, api, type Health, type TaskDTO } from '../api.ts';
 import { Empty, ErrorBox, Loading, noteHref, relDate, useToast } from './ui.tsx';
+import { recurrenceRu } from './TaskList.tsx';
 
 /** Задача Todoist в том виде, как её отдаёт /api/todoist (локальная копия @frame-os/todoist). */
 export interface TodoistTask {
@@ -108,9 +109,9 @@ export function TodoistPanel({ today }: { today: string }) {
 }
 
 const PRIO: Record<number, { label: string; tone: string } | undefined> = {
-  4: { label: 'P1', tone: 'red' },
-  3: { label: 'P2', tone: 'amber' },
-  2: { label: 'P3', tone: 'blue' },
+  4: { label: 'Срочно', tone: 'red' },
+  3: { label: 'Высокий', tone: 'amber' },
+  2: { label: 'Средний', tone: 'blue' },
 };
 
 function TodoistItem({ task, today }: { task: TodoistTask; today: string }) {
@@ -145,7 +146,7 @@ function TodoistItem({ task, today }: { task: TodoistTask; today: string }) {
           )}
           {task.due?.recurring && (
             <span className="chip">
-              <Repeat size={11} /> {task.due.string}
+              <Repeat size={11} /> {task.due.string ? recurrenceRu(task.due.string) : 'повторяется'}
             </span>
           )}
           {prio && (
@@ -171,7 +172,7 @@ function TodoistItem({ task, today }: { task: TodoistTask; today: string }) {
           )}
           {task.url && (
             <a href={task.url} target="_blank" rel="noreferrer" className="muted">
-              <ExternalLink size={11} /> Todoist
+              <ExternalLink size={11} /> открыть в Todoist
             </a>
           )}
         </div>

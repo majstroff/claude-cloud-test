@@ -136,7 +136,7 @@ export function HomePage() {
             {d.priorities.trim() ? (
               <div style={{ whiteSpace: 'pre-wrap' }}>{d.priorities}</div>
             ) : (
-              <Empty title="Приоритеты не заданы">Выберите 1–3 главных дела на странице Today.</Empty>
+              <Empty title="Приоритеты не заданы">Выберите 1–3 главных дела в разделе «Сегодня».</Empty>
             )}
           </section>
           <section className="card">

@@ -98,7 +98,7 @@ export async function registerTodoist(app: FastifyInstance, opts: TodoistIntegra
     if (!rel || typeof b.line !== 'number' || typeof b.raw !== 'string') {
       return send(reply, errorResponse(new TodoistError('validation', 'Нужны path, line и raw задачи')));
     }
-    if (!svc.configured) return send(reply, errorResponse(new TodoistError('not_configured', 'Todoist API token not found')));
+    if (!svc.configured) return send(reply, errorResponse(new TodoistError('not_configured', 'API-токен Todoist не найден')));
     const note = vault.require(rel);
     const task = note.tasks.find((t) => t.line === b.line && t.raw === b.raw) ?? note.tasks.find((t) => t.raw === b.raw);
     if (!task) {

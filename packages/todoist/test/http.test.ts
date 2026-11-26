@@ -73,7 +73,7 @@ describe("HTTP API /api/todoist", () => {
     const bad = await call("POST", "/api/todoist/tasks", { content: "" });
     expect(bad.status).toBe(400);
     expect(bad.body.error).toMatchObject({ code: "validation", retryable: false });
-    expect(bad.body.error.userMessage).toBeTruthy();
+    expect(bad.body.error.userMessage).toBe("Название задачи не может быть пустым");
     expect((await call("GET", "/api/todoist/tasks?view=bogus")).status).toBe(400);
     expect((await call("GET", "/api/todoist/tasks/missing")).status).toBe(404);
     expect((await call("GET", "/api/todoist/nope")).status).toBe(404);

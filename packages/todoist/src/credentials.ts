@@ -52,18 +52,18 @@ export async function resolveTodoistToken(deps: CredentialDeps = {}): Promise<Re
   if (file) {
     if (platform !== "win32") {
       const m = await mode(file).catch(() => {
-        throw new TodoistError("not_configured", "TODOIST_API_TOKEN_FILE does not exist or cannot be read");
+        throw new TodoistError("not_configured", "Файл из TODOIST_API_TOKEN_FILE не найден или недоступен");
       });
       if ((m & 0o077) !== 0) {
         throw new TodoistError(
           "not_configured",
-          `Token file is readable by other users. Run: chmod 600 "${file}"`,
+          `Файл с токеном доступен другим пользователям. Выполните: chmod 600 "${file}"`,
         );
       }
     }
     const token = (await read(file).catch(() => "")).trim();
     if (token) return { token, source: "file" };
-    throw new TodoistError("not_configured", "TODOIST_API_TOKEN_FILE is empty or unreadable");
+    throw new TodoistError("not_configured", "Файл из TODOIST_API_TOKEN_FILE пуст или не читается");
   }
 
   if (env.TODOIST_USE_KEYCHAIN === "0") return null;
@@ -91,6 +91,6 @@ export async function resolveTodoistToken(deps: CredentialDeps = {}): Promise<Re
 
 export async function requireTodoistToken(deps?: CredentialDeps): Promise<ResolvedToken> {
   const t = await resolveTodoistToken(deps);
-  if (!t) throw new TodoistError("not_configured", "Todoist API token not found");
+  if (!t) throw new TodoistError("not_configured", "API-токен Todoist не найден");
   return t;
 }
