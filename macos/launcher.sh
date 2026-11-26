@@ -56,6 +56,7 @@ start() {
     [ -f "$DATA_DIR/app-stopping" ] || break
     sleep 0.25
   done
+  rm -f "$DATA_DIR/app-stopping"
   if healthy; then
     # Сервер уже работает (например, запущен ярлыком .command) — им и пользуемся.
     exit 0

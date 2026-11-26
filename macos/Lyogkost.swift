@@ -32,6 +32,11 @@ func runLauncher(_ command: String) -> (Int32, String) {
     return (p.terminationStatus, String(data: data, encoding: .utf8) ?? "")
 }
 
+func dataDir() -> String {
+    let home = ProcessInfo.processInfo.environment["FRAME_HOME"] ?? (NSHomeDirectory() + "/Documents/Frame OS")
+    return home + "/.frame-data"
+}
+
 func isAppURL(_ url: URL) -> Bool {
     guard let scheme = url.scheme?.lowercased() else { return false }
     if scheme == "about" || scheme == "data" || scheme == "blob" { return true }
@@ -112,7 +117,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     func applicationWillTerminate(_ notification: Notification) {
         guard !stopped else { return }
         stopped = true
-        runLauncher("stop")
+        // Сервер останавливаем в фоне, чтобы программа завершилась сразу:
+        // иначе повторное нажатие на значок в эти секунды попадает в уходящую программу.
+        // launcher.sh start подождёт, пока остановка закончится.
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/bash")
+        p.arguments = ["-c", "touch \"$1/app-stopping\" 2>/dev/null; nohup /bin/bash \"$0\" stop >/dev/null 2>&1 &", launcherPath(), dataDir()]
+        try? p.run()
+        p.waitUntilExit()
     }
 
     // MARK: ссылки

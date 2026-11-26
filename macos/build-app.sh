@@ -94,6 +94,10 @@ if ! [ -w "$DEST" ]; then
 fi
 # Если программа запущена — завершаем её перед заменой.
 osascript -e "tell application id \"local.frame-os.lyogkost\" to quit" >/dev/null 2>&1 || true
+for _ in $(seq 1 40); do
+  [ "$(osascript -e 'application id "local.frame-os.lyogkost" is running' 2>/dev/null)" = "true" ] || break
+  sleep 0.25
+done
 rm -rf "${DEST:?}/$NAME.app"
 cp -R "$APP" "$DEST/"
 touch "$DEST/$NAME.app"
