@@ -1,0 +1,59 @@
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ApiError } from './api.ts';
+import { Layout } from './components/Layout.tsx';
+import { Empty, ToastProvider } from './components/ui.tsx';
+import { HomePage } from './pages/Home.tsx';
+import { TodayPage } from './pages/Today.tsx';
+import { ProjectPage, ProjectsPage } from './pages/Projects.tsx';
+import { StrategyPage } from './pages/Strategy.tsx';
+import { IdeasPage } from './pages/Ideas.tsx';
+import { BacklogPage } from './pages/Backlog.tsx';
+import { NotePage } from './pages/Note.tsx';
+import { FavoritesPage, SettingsPage } from './pages/Settings.tsx';
+import './styles.css';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5_000,
+      refetchOnWindowFocus: true,
+      retry: (count, err) => !(err instanceof ApiError && err.status >= 400 && err.status < 500) && count < 2,
+    },
+  },
+});
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <ToastProvider>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route index element={<HomePage />} />
+              <Route path="today" element={<TodayPage />} />
+              <Route path="strategy" element={<StrategyPage />} />
+              <Route path="projects" element={<ProjectsPage />} />
+              <Route path="projects/view" element={<ProjectPage />} />
+              <Route path="backlog" element={<BacklogPage />} />
+              <Route path="ideas" element={<IdeasPage />} />
+              <Route path="note" element={<NotePage />} />
+              <Route path="favorites" element={<FavoritesPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route
+                path="*"
+                element={
+                  <div className="card">
+                    <Empty title="Такой страницы нет" action={<Link className="btn small" to="/">На главную</Link>} />
+                  </div>
+                }
+              />
+            </Route>
+          </Routes>
+        </ToastProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  </StrictMode>,
+);

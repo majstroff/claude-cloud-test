@@ -1,0 +1,14 @@
+{
+  "name": "@frame-os/vault",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Frame OS: слой Obsidian Vault — Markdown, YAML, задачи, ссылки, поиск",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "yaml": "^2.9.1"
+  }
+}
