@@ -36,6 +36,27 @@ export function registerSpheresRoutes(app: FastifyInstance, s: Spheres): void {
       }),
     };
   });
+  const txInput = (b: Record<string, unknown>) => {
+    const kind = text(b.kind) as TxKind | null;
+    if (!kind || !TX_KINDS.includes(kind)) throw new VaultError('Тип операции: доход, расход или накопления', 'invalid');
+    return { date: text(b.date), kind, amount: amount(b.amount), category: text(b.category), description: text(b.description), link: text(b.link) };
+  };
+  const txRef = (b: Record<string, unknown>) => {
+    const line = Number(b.line);
+    const raw = typeof b.raw === 'string' ? b.raw : '';
+    if (!Number.isInteger(line) || line < 0 || !raw) throw new VaultError('Не указана строка операции', 'invalid');
+    return { rel: path({ path: b.path }), line, raw };
+  };
+  app.put('/api/finance/transactions', async (req) => {
+    const b = body(req);
+    const r = txRef(b);
+    return { transaction: await s.finance.updateTransaction(r.rel, r.line, r.raw, txInput(b)) };
+  });
+  app.post('/api/finance/transactions/delete', async (req) => {
+    const b = body(req);
+    const r = txRef(b);
+    return { deleted: await s.finance.deleteTransaction(r.rel, r.line, r.raw) };
+  });
   app.put('/api/finance/budget', async (req) => {
     const b = body(req);
     if (!Array.isArray(b.limits)) throw new VaultError('Нет списка лимитов', 'invalid');
@@ -90,6 +111,32 @@ export function registerSpheresRoutes(app: FastifyInstance, s: Spheres): void {
   app.post('/api/learning/progress', async (req) => {
     const b = body(req);
     return { item: await s.learning.setProgress(path(b), { progress: b.progress, status: text(b.status) }) };
+  });
+  // Аудио и видео материала: список, загрузка файла (поток), ссылки, удаление с «Отменить».
+  app.get('/api/learning/media', async (req) => ({ items: await s.learning.media(path(query(req))) }));
+  app.post('/api/learning/media/upload', async (req) => {
+    const q = query(req);
+    const name = required(text(q.name), 'имя файла');
+    if (!req.headers['content-type']?.startsWith('application/octet-stream')) throw new VaultError('Файл передаётся как application/octet-stream', 'invalid');
+    return { items: await s.learning.attachMedia(path(q), name, req.body as import('node:stream').Readable, text(q.title)) };
+  });
+  app.post('/api/learning/media/link', async (req) => {
+    const b = body(req);
+    return { items: await s.learning.addMediaLink(path(b), { url: required(text(b.url), 'ссылка'), title: text(b.title) }) };
+  });
+  app.post('/api/learning/media/delete', async (req) => {
+    const b = body(req);
+    const line = Number(b.line);
+    if (!Number.isInteger(line) || typeof b.raw !== 'string') throw new VaultError('Не указана запись', 'invalid');
+    return { deleted: await s.learning.removeMedia(path(b), { line, raw: b.raw }) };
+  });
+  app.post('/api/learning/media/restore', async (req) => {
+    const b = body(req);
+    const line = Number(b.line);
+    if (!Number.isInteger(line) || typeof b.raw !== 'string') throw new VaultError('Не указана запись', 'invalid');
+    const t = b.trashed as { from?: unknown; to?: unknown } | null | undefined;
+    const trashed = t && typeof t.from === 'string' && typeof t.to === 'string' ? { from: t.from, to: t.to } : null;
+    return { items: await s.learning.restoreMedia(path(b), { line, raw: b.raw, trashed }) };
   });
   app.post('/api/learning/quote', async (req) => {
     const b = body(req);

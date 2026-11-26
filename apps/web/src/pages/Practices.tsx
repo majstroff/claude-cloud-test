@@ -76,7 +76,7 @@ export function PracticesPage() {
               </div>
             </div>
           </div>
-          <div className="small muted" style={{ marginTop: 10, fontSize: 11 }}>Фаза рассчитывается по астрономической формуле на полдень, точность — около суток.</div>
+          <div className="small muted" style={{ marginTop: 10 }}>Фаза рассчитывается по астрономической формуле на полдень, точность — около суток.</div>
         </section>
 
         <section className="card">

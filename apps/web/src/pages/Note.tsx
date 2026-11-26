@@ -1,13 +1,15 @@
+import { NoteLinesCard } from '../components/NoteLines.tsx';
 import { useMemo, useState, type MouseEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { Lock, Pencil, Star } from 'lucide-react';
+import { Lock, Pencil, Star, WandSparkles } from 'lucide-react';
 import { api, ApiError, type Health, type NoteData, type NoteSummary } from '../api.ts';
 import { TaskList } from '../components/TaskList.tsx';
 import { Empty, ErrorBox, Loading, TYPE_LABEL, noteHref, useToast } from '../components/ui.tsx';
 import { useFavorite } from './Projects.tsx';
+import { DeleteNoteButton } from '../components/DeleteNote.tsx';
 
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -75,9 +77,15 @@ export function NotePage() {
                 Карточка проекта
               </Link>
             )}
+            {!n.sensitive && n.type !== 'document' && n.type !== 'daily' && (
+              <Link className="btn small" to={`/assistant?tool=note&path=${encodeURIComponent(n.path)}`}>
+                <WandSparkles size={14} /> Помощник
+              </Link>
+            )}
             <button className="btn small icon" aria-label={n.favorite ? 'Убрать из избранного' : 'В избранное'} onClick={() => fav.mutate({ path: n.path, favorite: !n.favorite })}>
               <Star size={14} fill={n.favorite ? 'currentColor' : 'none'} />
             </button>
+            {!editing && <DeleteNoteButton path={n.path} title={n.title} />}
             {!editing && (
               <button className="btn small" onClick={() => setEditing(true)}>
                 <Pencil size={14} /> Редактировать
@@ -93,6 +101,7 @@ export function NotePage() {
         </section>
       </div>
       <div className="stack">
+        {!editing && <NoteLinesCard path={path} />}
         {fmEntries.length > 0 && (
           <section className="card">
             <h3 className="card-title" style={{ marginBottom: 10 }}>Свойства</h3>

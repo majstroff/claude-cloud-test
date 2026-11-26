@@ -1,10 +1,13 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { watch, type FSWatcher } from 'node:fs';
 import fs from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { pipeline } from 'node:stream/promises';
+import { Transform, type Readable } from 'node:stream';
 import path from 'node:path';
 import { systemClock, type Clock } from './dates.ts';
 import { buildNote, parseFrontmatter, splitFrontmatter, updateFrontmatter, type Frontmatter } from './frontmatter.ts';
-import { extractFrontmatterLinks, extractLinks, extractTags, firstHeading, maskCode, type RawLink } from './markdown.ts';
+import { extractFrontmatterLinks, extractLinks, extractTags, findSections, firstHeading, maskCode, type RawLink } from './markdown.ts';
 import { SearchIndex, type SearchHit } from './search.ts';
 import { TASK_LINE, effectiveDate, parseTaskLine, type ParsedTask } from './tasks.ts';
 
@@ -89,6 +92,8 @@ export interface FolderConfig {
   travel: string;
   /** Отношения: важные даты и близкие люди. */
   relationships: string;
+  /** Итоги недели и месяца. */
+  reviews: string;
   /** Формат имени файла ежедневной заметки (поддерживаются YYYY, MM, DD). */
   dailyFormat: string;
   dailyTemplate: string | null;
@@ -336,6 +341,7 @@ export class Vault {
       knowledge: byBase(/^(knowledge|knowledge base|wiki|знания|база знаний)$/i, `${resources}/Знания`),
       travel: byBase(/^(travel|travels|trips|путешествия|поездки)$/i, `${areas}/Путешествия`),
       relationships: byBase(/^(relationships|relations|отношения|близкие)$/i, `${areas}/Отношения`),
+      reviews: byBase(/^(reviews?|итоги|обзоры)$/i, `${areas}/Итоги`),
       daily,
       dailyFormat,
       dailyTemplate,
@@ -682,6 +688,197 @@ export class Vault {
     return { note, line: resultLine };
   }
 
+  /**
+   * Записи заметки по секциям: непустые строки под заголовками (пункты списков,
+   * цитаты, строки таблиц, абзацы). Заголовки, шапки таблиц и код не входят.
+   */
+  async noteLines(rel: string): Promise<Array<{ heading: string; items: Array<{ line: number; raw: string }> }>> {
+    const content = await this.readFresh(rel);
+    const { bodyLine } = splitFrontmatter(content);
+    const lines = content.split('\n').map((l) => l.replace(/\r$/, ''));
+    const out: Array<{ heading: string; items: Array<{ line: number; raw: string }> }> = [];
+    const sections = findSections(lines).filter((s) => s.start >= bodyLine && s.level >= 2);
+    for (const s of sections) {
+      const items: Array<{ line: number; raw: string }> = [];
+      let inFence = false;
+      for (let i = s.start + 1; i < s.end; i++) {
+        const raw = lines[i]!;
+        if (/^\s*```/.test(raw)) {
+          inFence = !inFence;
+          continue;
+        }
+        if (!inFence && /^#{1,6}\s/.test(raw)) break; // подзаголовок — своя секция
+        if (inFence || !raw.trim()) continue;
+        // Шапка таблицы и разделитель |---| — не записи.
+        if (/^\s*\|?\s*:?-{3,}/.test(raw)) continue;
+        if (/^\s*\|/.test(raw) && /^\s*\|?\s*:?-{3,}/.test(lines[i + 1] ?? '')) continue;
+        items.push({ line: i, raw });
+      }
+      if (items.length) out.push({ heading: s.heading, items });
+    }
+    return out;
+  }
+
+  /** Заменяет (text — строка) или удаляет (text = null) одну строку заметки. Свойства и заголовки не трогает. */
+  async editLine(rel: string, line: number, expectedRaw: string, text: string | null): Promise<{ line: number; raw: string }> {
+    if (text !== null) {
+      if (/[\r\n]/.test(text)) throw new VaultError('Запись должна быть одной строкой', 'invalid');
+      if (!text.trim()) throw new VaultError('Запись не может быть пустой. Чтобы убрать её, нажмите «Удалить».', 'invalid');
+    }
+    let at = line;
+    await this.transform(rel, (content) => {
+      const { bodyLine } = splitFrontmatter(content);
+      const lines = content.split('\n');
+      const strip = (x: string | undefined) => (x ?? '').replace(/\r$/, '');
+      let idx = line;
+      if (strip(lines[idx]) !== expectedRaw) {
+        const found = lines.map(strip).flatMap((l, i) => (l === expectedRaw ? [i] : []));
+        if (found.length !== 1) throw new VaultError('Запись изменилась в Obsidian. Обновите страницу и повторите.', 'conflict');
+        idx = found[0]!;
+      }
+      if (idx < bodyLine || /^#{1,6}\s/.test(strip(lines[idx]))) throw new VaultError('Эту строку нельзя менять здесь', 'invalid');
+      at = idx;
+      const cr = lines[idx]!.endsWith('\r') ? '\r' : '';
+      if (text === null) lines.splice(idx, 1);
+      else lines[idx] = text + cr;
+      return lines.join('\n');
+    });
+    return { line: at, raw: expectedRaw };
+  }
+
+  /** Вставляет строку обратно (для «Отменить» после удаления записи). */
+  async insertLine(rel: string, line: number, raw: string): Promise<void> {
+    if (/[\r\n]/.test(raw) || !raw.trim()) throw new VaultError('Некорректная запись', 'invalid');
+    await this.transform(rel, (content) => {
+      const { bodyLine } = splitFrontmatter(content);
+      const lines = content.split('\n');
+      lines.splice(Math.max(bodyLine, Math.min(line, lines.length)), 0, raw);
+      return lines.join('\n');
+    });
+  }
+
+  // ---------- Вложения: аудио и видео ----------
+
+  /** Папка вложений: как в настройках Obsidian (attachmentFolderPath), иначе «<Resources>/Вложения». */
+  async attachmentsFolder(): Promise<string> {
+    try {
+      const cfg = JSON.parse(await fs.readFile(path.join(this.root, '.obsidian', 'app.json'), 'utf8')) as { attachmentFolderPath?: string };
+      const f = (cfg.attachmentFolderPath ?? '').replace(/^\/+|\/+$/g, '');
+      if (f && !f.startsWith('.')) {
+        this.assertRelDir(f);
+        return f;
+      }
+    } catch {
+      /* настроек нет — папка по умолчанию */
+    }
+    return `${this.folders.resources || 'Resources'}/Вложения`;
+  }
+
+  /** Абсолютный путь к медиафайлу внутри хранилища (только аудио и видео, без служебных папок). */
+  assetPath(rel: string): string {
+    if (typeof rel !== 'string' || !rel.trim()) throw new VaultError('Не указан файл', 'invalid');
+    const clean = rel.replace(/\\/g, '/');
+    if (clean.startsWith('/') || /^[a-zA-Z]:/.test(clean)) throw new VaultError(`Недопустимый путь: ${rel}`, 'forbidden');
+    this.assertRelDir(clean);
+    if (!mediaKind(clean)) throw new VaultError('Поддерживаются только аудио и видео', 'forbidden');
+    const abs = path.resolve(this.root, clean);
+    if (!abs.startsWith(this.root + path.sep)) throw new VaultError(`Путь вне хранилища: ${rel}`, 'forbidden');
+    return abs;
+  }
+
+  /** Находит файл вложения по имени из ![[…]]: рядом с заметкой, в папке вложений или где угодно в хранилище. */
+  async findAsset(name: string, fromNote: string): Promise<string | null> {
+    const clean = name.replace(/\\/g, '/').trim();
+    if (!mediaKind(clean)) return null;
+    const candidates = [clean, `${path.posix.dirname(fromNote)}/${clean}`, `${await this.attachmentsFolder()}/${path.posix.basename(clean)}`];
+    for (const c of candidates) {
+      try {
+        if (await exists(this.assetPath(c))) return path.posix.normalize(c);
+      } catch {
+        /* недопустимый путь — пропускаем */
+      }
+    }
+    const base = path.posix.basename(clean).toLowerCase();
+    const walk = async (dir: string): Promise<string | null> => {
+      let entries: import('node:fs').Dirent[];
+      try {
+        entries = await fs.readdir(path.join(this.root, dir), { withFileTypes: true });
+      } catch {
+        return null;
+      }
+      for (const e of entries) {
+        if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+        const rel = dir ? `${dir}/${e.name}` : e.name;
+        if (e.isFile() && e.name.toLowerCase() === base) return rel;
+        if (e.isDirectory()) {
+          const r = await walk(rel);
+          if (r) return r;
+        }
+      }
+      return null;
+    };
+    return walk('');
+  }
+
+  /** Сохраняет загруженный файл в папку вложений; возвращает путь. maxBytes — предел размера. */
+  async saveAttachment(name: string, data: Readable, maxBytes: number): Promise<{ path: string; size: number }> {
+    const base = path.posix.basename(name.replace(/\\/g, '/')).replace(/[\x00-\x1f<>:"|?*#^[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!base || base.startsWith('.')) throw new VaultError('Некорректное имя файла', 'invalid');
+    if (!mediaKind(base)) throw new VaultError('Можно прикреплять аудио (mp3, m4a, aac, wav, flac, ogg, opus) и видео (mp4, m4v, mov, webm)', 'invalid');
+    const folder = await this.attachmentsFolder();
+    const ext = path.posix.extname(base);
+    const stem = base.slice(0, base.length - ext.length);
+    let rel = `${folder}/${base}`;
+    for (let i = 2; await exists(this.assetPath(rel)); i++) rel = `${folder}/${stem} ${i}${ext}`;
+    const abs = this.assetPath(rel);
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    const real = await fs.realpath(path.dirname(abs));
+    const realRoot = await fs.realpath(this.root);
+    if (real !== realRoot && !real.startsWith(realRoot + path.sep)) throw new VaultError('Путь вне хранилища', 'forbidden');
+    const tmp = path.join(path.dirname(abs), `.${path.basename(abs)}.${randomBytes(4).toString('hex')}.part`);
+    let size = 0;
+    const limit = new Transform({
+      transform(chunk: Buffer, _enc, cb) {
+        size += chunk.length;
+        if (size > maxBytes) cb(new VaultError(`Файл больше ${Math.round(maxBytes / 1024 ** 3)} ГБ`, 'invalid'));
+        else cb(null, chunk);
+      },
+    });
+    try {
+      await pipeline(data, limit, createWriteStream(tmp));
+      if (size === 0) throw new VaultError('Файл пустой', 'invalid');
+      await fs.rename(tmp, abs);
+    } catch (e) {
+      await fs.rm(tmp, { force: true });
+      throw e;
+    }
+    return { path: rel, size };
+  }
+
+  /** Переносит медиафайл в корзину Obsidian (.trash). */
+  async trashAsset(rel: string): Promise<{ from: string; to: string }> {
+    const src = this.assetPath(rel);
+    if (!(await exists(src))) throw new VaultError(`Файл не найден: ${rel}`, 'not_found');
+    const trashDir = path.join(this.root, '.trash');
+    await fs.mkdir(trashDir, { recursive: true });
+    const ext = path.posix.extname(rel);
+    const stem = path.posix.basename(rel, ext);
+    let name = `${stem}${ext}`;
+    for (let i = 2; await exists(path.join(trashDir, name)); i++) name = `${stem} ${i}${ext}`;
+    await fs.rename(src, path.join(trashDir, name));
+    return { from: rel, to: `.trash/${name}` };
+  }
+
+  /** Возвращает медиафайл из корзины на прежнее место. */
+  async restoreAsset(trashed: { from: string; to: string }): Promise<void> {
+    const name = path.posix.basename(trashed.to);
+    if (!trashed.to.startsWith('.trash/') || name !== trashed.to.slice(7) || !mediaKind(name)) throw new VaultError('Некорректный файл в корзине', 'invalid');
+    const dest = this.assetPath(trashed.from);
+    if (await exists(dest)) throw new VaultError('Файл с таким именем уже есть', 'conflict');
+    await fs.mkdir(path.dirname(dest), { recursive: true });
+    await fs.rename(path.join(this.root, '.trash', name), dest);
+  }
+
   /** Перемещает заметку в другую папку (например, в архив). Ссылки по имени продолжают работать. */
   async move(rel: string, toFolder: string): Promise<Note> {
     const src = this.safePath(rel);
@@ -695,6 +892,24 @@ export class Vault {
     this.dropNote(rel);
     await this.refresh(destRel);
     return this.require(destRel);
+  }
+
+  /**
+   * Удаление в корзину Obsidian: файл переносится в `.trash` внутри хранилища
+   * (так же делает сам Obsidian), его можно вернуть вручную. Безвозвратно не удаляется.
+   */
+  async trash(rel: string): Promise<{ from: string; to: string }> {
+    const src = this.safePath(rel);
+    if (!(await exists(src))) throw new VaultError(`Заметка не найдена: ${rel}`, 'not_found');
+    const trashDir = path.join(this.root, '.trash');
+    await fs.mkdir(trashDir, { recursive: true });
+    const base = path.posix.basename(rel, '.md');
+    let name = `${base}.md`;
+    for (let i = 2; await exists(path.join(trashDir, name)); i++) name = `${base} ${i}.md`;
+    await fs.rename(src, path.join(trashDir, name));
+    this.dropNote(rel);
+    this.emit([rel]);
+    return { from: rel, to: `.trash/${name}` };
   }
 
   dailyPath(date: string): string {
@@ -786,6 +1001,19 @@ function stripEmpty<T extends object>(o: T): Partial<T> {
   const out: Partial<T> = {};
   for (const [k, v] of Object.entries(o)) if (v !== undefined && v !== null && v !== '') (out as Record<string, unknown>)[k] = v;
   return out;
+}
+
+const AUDIO_EXT = ['mp3', 'm4a', 'aac', 'wav', 'flac', 'ogg', 'oga', 'opus'];
+const VIDEO_EXT = ['mp4', 'm4v', 'mov', 'webm'];
+export const MEDIA_MIME: Record<string, string> = {
+  mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav', flac: 'audio/flac', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg',
+  mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
+};
+
+/** audio / video по расширению файла, иначе null. */
+export function mediaKind(file: string): 'audio' | 'video' | null {
+  const ext = path.posix.extname(file).slice(1).toLowerCase();
+  return AUDIO_EXT.includes(ext) ? 'audio' : VIDEO_EXT.includes(ext) ? 'video' : null;
 }
 
 async function exists(abs: string): Promise<boolean> {

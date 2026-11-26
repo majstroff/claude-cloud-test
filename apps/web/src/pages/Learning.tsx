@@ -1,3 +1,4 @@
+import { DeleteNoteButton } from '../components/DeleteNote.tsx';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -54,6 +55,7 @@ function ItemCard({ it, today }: { it: LearningItemDTO; today: string }) {
           </div>
         </Link>
         <span className={`chip ${it.status === 'active' ? 'blue' : it.status === 'done' ? 'green' : ''}`}>{LEARN_STATUS_LABEL[it.status]}</span>
+        <DeleteNoteButton path={it.path} title={it.title} after={null} iconOnly />
       </div>
       {(it.status === 'active' || it.status === 'paused') && <Progress value={it.percent} tone="blue" />}
       <div className="small muted">
@@ -89,6 +91,7 @@ function SkillCard({ s, today }: { s: SkillDTO; today: string }) {
             {` · ${s.hours} ч практики`}
           </div>
         </Link>
+        <DeleteNoteButton path={s.path} title={s.title} after={null} iconOnly />
       </div>
       {weekPct !== null && <Progress value={weekPct} tone="green" />}
       <div className="small muted">

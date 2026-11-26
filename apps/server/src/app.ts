@@ -1,12 +1,17 @@
 import fs from 'node:fs';
+import { execFile } from 'node:child_process';
+import { createReadStream } from 'node:fs';
 import path from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import {
+  Assistant,
   Crm,
+  Journal,
   Life,
   Spheres,
   Vault,
+  MEDIA_MIME,
   VaultError,
   endOfMonth,
   isIsoDate,
@@ -21,6 +26,7 @@ import { StateStore } from './state.ts';
 import { registerCrmRoutes } from './crm-routes.ts';
 import { registerSpheresRoutes } from './spheres-routes.ts';
 import { registerPersonalRoutes } from './personal-routes.ts';
+import { registerJournalRoutes } from './journal-routes.ts';
 import { KNOWN_INTEGRATIONS, registerIntegrations, type IntegrationStatus } from './integrations.ts';
 
 export interface AppOptions {
@@ -33,6 +39,21 @@ export interface AppOptions {
   logger?: boolean;
   /** Подмена интеграций в тестах (см. IntegrationContext). */
   integrations?: { todoist?: import('@frame-os/todoist').TodoistSyncService | null };
+  /**
+   * Открыть внешнюю ссылку в браузере по умолчанию (для окна программы «Лёгкость.app»).
+   * По умолчанию на macOS — команда `open`, на других системах недоступно.
+   */
+  openExternal?: ((url: string) => Promise<void>) | null;
+}
+
+const EXTERNAL_SCHEMES = ['http:', 'https:', 'mailto:', 'tel:', 'obsidian:'];
+
+function defaultOpenExternal(): ((url: string) => Promise<void>) | null {
+  if (process.platform !== 'darwin') return null;
+  return (url) =>
+    new Promise((resolve, reject) => {
+      execFile('open', [url], (err) => (err ? reject(err) : resolve()));
+    });
 }
 
 export class HttpError extends Error {
@@ -57,7 +78,7 @@ const TASK_VIEWS: TaskView[] = ['today', 'overdue', 'upcoming', 'backlog', 'done
 const FOLDER_KEYS: Array<keyof FolderConfig> = [
   'projects', 'areas', 'resources', 'archive', 'goals', 'cycles', 'ideas', 'inbox', 'daily', 'events',
   'work', 'contacts', 'companies', 'documents', 'finance', 'health', 'learning', 'practices', 'home',
-  'knowledge', 'travel', 'relationships',
+  'knowledge', 'travel', 'relationships', 'reviews',
 ];
 
 export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { vault: Vault; life: Life; crm: Crm; spheres: Spheres }> {
@@ -68,6 +89,8 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
   const life = new Life(vault);
   const crm = new Crm(life);
   const spheres = new Spheres(life);
+  const journal = new Journal(life, spheres);
+  const assistant = new Assistant(life, spheres, crm);
   if (opts.watch) vault.watch();
   app.addHook('onClose', async () => vault.unwatch());
 
@@ -103,6 +126,22 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
   });
 
   // --- Служебное ---
+  const openExternal = opts.openExternal === undefined ? defaultOpenExternal() : opts.openExternal;
+  app.post('/api/open-external', async (req) => {
+    const raw = (req.body as { url?: unknown } | null)?.url;
+    if (typeof raw !== 'string' || raw.length > 4000) throw new HttpError(400, 'Нужна ссылка');
+    let url: URL;
+    try {
+      url = new URL(raw);
+    } catch {
+      throw new HttpError(400, 'Некорректная ссылка');
+    }
+    if (!EXTERNAL_SCHEMES.includes(url.protocol)) throw new HttpError(400, 'Такие ссылки открывать нельзя');
+    if (!openExternal) throw new HttpError(501, 'Открытие во внешнем браузере недоступно на этой системе');
+    await openExternal(url.toString());
+    return { ok: true };
+  });
+
   app.get('/api/health', async () => {
     const statuses: IntegrationStatus[] = [];
     for (const known of KNOWN_INTEGRATIONS) {
@@ -117,7 +156,8 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
         statuses.push({ ...known, state: 'not_installed', message: 'Модуль интеграции ещё не подключён к этой сборке' });
       }
     }
-    return { ok: true, today: vault.today(), vault: vault.stats(), integrations: statuses };
+    // clients — сколько окон интерфейса сейчас открыто (по потокам событий); нужно программе «Лёгкость.app».
+    return { ok: true, today: vault.today(), vault: vault.stats(), integrations: statuses, clients: streams.size };
   });
 
   app.post('/api/reindex', async () => {
@@ -251,6 +291,63 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
     return { path: n.path };
   });
 
+  // Медиафайлы хранилища (аудио, видео) с поддержкой перемотки (Range).
+  app.addContentTypeParser('application/octet-stream', (_req, payload, done) => done(null, payload));
+  app.get('/api/media', async (req, reply) => {
+    const rel = required(str(query(req).path), 'path');
+    const abs = vault.assetPath(rel);
+    let st: fs.Stats;
+    try {
+      st = await fs.promises.stat(abs);
+    } catch {
+      throw new HttpError(404, 'Файл не найден');
+    }
+    const ext = path.extname(abs).slice(1).toLowerCase();
+    reply.header('Accept-Ranges', 'bytes').header('Content-Type', MEDIA_MIME[ext] ?? 'application/octet-stream').header('Cache-Control', 'no-cache');
+    const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ''));
+    if (range && (range[1] || range[2])) {
+      let start = range[1] ? Number(range[1]) : st.size - Number(range[2]);
+      let end = range[1] && range[2] ? Number(range[2]) : st.size - 1;
+      start = Math.max(0, start);
+      end = Math.min(end, st.size - 1);
+      if (start > end) return reply.code(416).header('Content-Range', `bytes */${st.size}`).send();
+      reply.code(206).header('Content-Range', `bytes ${start}-${end}/${st.size}`).header('Content-Length', end - start + 1);
+      return reply.send(createReadStream(abs, { start, end }));
+    }
+    reply.header('Content-Length', st.size);
+    return reply.send(createReadStream(abs));
+  });
+
+  // Отдельные записи заметки (цитаты, журнал, история…): правка и удаление строк.
+  app.get('/api/note/lines', async (req) => ({ sections: await vault.noteLines(required(str(query(req).path), 'path')) }));
+  const lineRef = (b: Record<string, unknown>) => {
+    if (typeof b.line !== 'number' || typeof b.raw !== 'string') throw new HttpError(400, 'Нужны line и raw записи');
+    return { path: required(str(b.path), 'path'), line: b.line, raw: b.raw };
+  };
+  app.post('/api/note/line', async (req) => {
+    const b = obj(req.body);
+    const r = lineRef(b);
+    const text = b.text === null ? null : typeof b.text === 'string' ? b.text : undefined;
+    if (text === undefined) throw new HttpError(400, 'Нужен text (строка) или null для удаления');
+    return { ...(await vault.editLine(r.path, r.line, r.raw, text)), path: r.path };
+  });
+  app.post('/api/note/line/restore', async (req) => {
+    const r = lineRef(obj(req.body));
+    await vault.insertLine(r.path, r.line, r.raw);
+    return { ok: true };
+  });
+
+  app.post('/api/note/trash', async (req) => {
+    const b = obj(req.body);
+    const rel = required(str(b.path), 'path');
+    if (b.confirmed !== true) throw new HttpError(400, 'Удаление требует подтверждения');
+    const res = await vault.trash(rel);
+    await state.update((s) => {
+      s.favorites = s.favorites.filter((f) => f !== rel);
+    });
+    return res;
+  });
+
   // --- Избранное ---
   app.get('/api/favorites', async () => ({
     favorites: state
@@ -298,7 +395,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
   app.patch('/api/tasks', async (req) => {
     const b = obj(req.body);
     const action = str(b.action);
-    if (!['complete', 'reopen', 'setDue', 'setPriority'].includes(action ?? '')) throw new HttpError(400, 'Неизвестное действие');
+    if (!['complete', 'reopen', 'setDue', 'setPriority', 'rename'].includes(action ?? '')) throw new HttpError(400, 'Неизвестное действие');
     if (typeof b.line !== 'number' || typeof b.raw !== 'string') throw new HttpError(400, 'Нужны line и raw задачи');
     const task = await life.updateTask({
       path: required(str(b.path), 'path'),
@@ -307,12 +404,20 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
       action: action as 'complete',
       due: b.due === null ? null : str(b.due),
       priority: priority(b.priority),
+      text: typeof b.text === 'string' ? b.text : undefined,
     });
     return { task };
   });
 
+  const taskRef = (b: Record<string, unknown>) => {
+    if (typeof b.line !== 'number' || typeof b.raw !== 'string') throw new HttpError(400, 'Нужны line и raw задачи');
+    return { path: required(str(b.path), 'path'), line: b.line, raw: b.raw };
+  };
+  app.post('/api/tasks/delete', async (req) => ({ deleted: await life.deleteTask(taskRef(obj(req.body))) }));
+  app.post('/api/tasks/restore', async (req) => ({ task: await life.restoreTask(taskRef(obj(req.body))) }));
+
   // --- Главная, день, календарь ---
-  app.get('/api/dashboard', async () => ({ ...life.dashboard(), reminders: crm.reminders(), spheres: spheres.dashboard() }));
+  app.get('/api/dashboard', async () => ({ ...life.dashboard(), reminders: crm.reminders(), spheres: spheres.dashboard(), journal: { streak: journal.streak(), writtenToday: !!journal.summary(vault.today(), 0)?.written } }));
 
   app.get('/api/day', async (req) => {
     const date = str(query(req).date) ?? vault.today();
@@ -432,6 +537,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
   registerCrmRoutes(app, crm, spheres);
   registerSpheresRoutes(app, spheres);
   registerPersonalRoutes(app, spheres, crm);
+  registerJournalRoutes(app, journal, assistant);
 
   app.all('/api/*', async (req, reply) => reply.code(404).send({ error: `Нет такого метода API: ${req.method} ${req.url.split('?')[0]}` }));
 

@@ -1,3 +1,5 @@
+import { MediaCard } from '../components/Media.tsx';
+import { NoteLinesCard } from '../components/NoteLines.tsx';
 import { useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -37,6 +39,7 @@ import {
 import { ProgressForm } from './Learning.tsx';
 import { GiftsCard, bookingWhen, inDays } from '../components/Personal.tsx';
 import { BOOKING_KIND_LABEL, DATE_KIND_LABEL } from '../entities.ts';
+import { DeleteNoteButton } from '../components/DeleteNote.tsx';
 
 const BACK: Record<string, [string, string]> = {
   subscription: ['/finance?tab=regular', 'Финансы'],
@@ -121,12 +124,14 @@ function Shell({ path, title, sub, chips, children, side, type }: { path: string
             <Link className="btn small" to={noteHref(path)}>
               <FileText size={14} /> Заметка
             </Link>
+            <DeleteNoteButton path={path} title={title} />
           </div>
         </section>
         {children}
       </div>
       <div className="stack">
         <EditEntityCard path={path} defs={fieldsFor(type)} />
+        <NoteLinesCard path={path} />
         {side}
       </div>
     </div>
@@ -460,6 +465,7 @@ function LearningView({ path }: { path: string }) {
                   </button>
                 </form>
               </section>
+              <MediaCard path={path} />
               <section className="card">
                 <h3 className="card-title" style={{ marginBottom: 8 }}>Журнал</h3>
                 <HistoryList items={d.journal.map((j) => ({ date: j.date, text: `${j.minutes} мин${j.text ? ` · ${j.text}` : ''}` }))} empty="Занятий пока нет" />
@@ -523,6 +529,7 @@ function LearningView({ path }: { path: string }) {
                 </div>
               )}
             </section>
+            <MediaCard path={path} />
             <section className="card">
               <h3 className="card-title" style={{ marginBottom: 8 }}>Практические действия</h3>
               {d.actions.length === 0 ? <Empty title="Действий пока нет">Что из прочитанного применить? Действие станет задачей и появится в «Сегодня» или бэклоге.</Empty> : <TaskList tasks={d.actions} today={today} showSource={false} />}

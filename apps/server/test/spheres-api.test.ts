@@ -30,6 +30,63 @@ async function send(method: 'POST' | 'PUT', url: string, payload: unknown, heade
   return { status: r.statusCode, body: r.json() };
 }
 
+describe('API: видео и аудио в обучении', () => {
+  it('загружает файл потоком, отдаёт его с перемоткой и не пускает чужие файлы', async () => {
+    const rel = 'Resources/Обучение/Книги/Inspired.md';
+    const up = await app.inject({
+      method: 'POST',
+      url: `/api/learning/media/upload?path=${encodeURIComponent(rel)}&name=${encodeURIComponent('урок.mp4')}`,
+      headers: { ...H, 'content-type': 'application/octet-stream' },
+      payload: Buffer.from('0123456789'),
+    });
+    expect(up.statusCode).toBe(200);
+    const item = up.json().items[0];
+    expect(item).toMatchObject({ kind: 'video', file: 'Resources/Вложения/урок.mp4' });
+    const noHeader = await app.inject({ method: 'POST', url: `/api/learning/media/upload?path=${encodeURIComponent(rel)}&name=x.mp3`, headers: { host: H.host, 'content-type': 'application/octet-stream' }, payload: Buffer.from('1') });
+    expect(noHeader.statusCode).toBe(403);
+
+    const full = await app.inject({ method: 'GET', url: `/api/media?path=${encodeURIComponent(item.file)}`, headers: { host: H.host } });
+    expect(full.statusCode).toBe(200);
+    expect(full.headers['content-type']).toBe('video/mp4');
+    expect(full.body).toBe('0123456789');
+    const part = await app.inject({ method: 'GET', url: `/api/media?path=${encodeURIComponent(item.file)}`, headers: { host: H.host, range: 'bytes=2-5' } });
+    expect(part.statusCode).toBe(206);
+    expect(part.headers['content-range']).toBe('bytes 2-5/10');
+    expect(part.body).toBe('2345');
+    expect((await app.inject({ method: 'GET', url: `/api/media?path=${encodeURIComponent(rel)}`, headers: { host: H.host } })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'GET', url: `/api/media?path=${encodeURIComponent('../secret.mp3')}`, headers: { host: H.host } })).statusCode).toBe(403);
+
+    const del = await send('POST', '/api/learning/media/delete', { path: rel, line: item.line, raw: item.raw });
+    expect(del.body.deleted.trashed.to).toBe('.trash/урок.mp4');
+    const back = await send('POST', '/api/learning/media/restore', del.body.deleted);
+    expect(back.body.items[0].file).toBe('Resources/Вложения/урок.mp4');
+  });
+});
+
+describe('API: правка и удаление строк', () => {
+  it('операция: изменение, удаление и возврат; задача: текст, удаление и возврат', async () => {
+    const add = await send('POST', '/api/finance/transactions', { kind: 'expense', amount: 1500, category: 'Продукты', description: 'Тест' });
+    const tx = add.body.transaction;
+    expect((await send('PUT', '/api/finance/transactions', { ...tx, amount: 900, link: '' }, { host: H.host })).status).toBe(403);
+    const upd = await send('PUT', '/api/finance/transactions', { path: tx.path, line: tx.line, raw: tx.raw, kind: 'expense', amount: 900, category: 'Кафе', description: 'Тест', date: tx.date });
+    expect(upd.status).toBe(200);
+    expect(upd.body.transaction).toMatchObject({ amount: 900, category: 'Кафе' });
+    expect((await send('POST', '/api/finance/transactions/delete', { path: tx.path, line: tx.line })).status).toBe(400);
+    const del = await send('POST', '/api/finance/transactions/delete', { path: tx.path, line: upd.body.transaction.line, raw: upd.body.transaction.raw });
+    expect(del.body.deleted).toMatchObject({ amount: 900, description: 'Тест' });
+
+    const t = (await send('POST', '/api/tasks', { text: 'Проверить API' })).body.task;
+    const r = await app.inject({ method: 'PATCH', url: '/api/tasks', headers: H, payload: { path: t.path, line: t.line, raw: t.raw, action: 'rename', text: 'Проверить API ещё раз' } });
+    const renamed = r.json().task;
+    expect(renamed.title).toBe('Проверить API ещё раз');
+    const gone = await send('POST', '/api/tasks/delete', { path: renamed.path, line: renamed.line, raw: renamed.raw });
+    expect(gone.status).toBe(200);
+    const back = await send('POST', '/api/tasks/restore', gone.body.deleted);
+    expect(back.body.task.title).toBe('Проверить API ещё раз');
+    expect((await send('POST', '/api/tasks/restore', { path: t.path, line: 0, raw: 'не задача' })).status).toBe(400);
+  });
+});
+
 describe('API: финансы', () => {
   it('сводка, операция, оплата подписки и бюджет', async () => {
     const f = await get('/api/finance?month=2026-11');

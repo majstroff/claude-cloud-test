@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Inbox } from 'lucide-react';
 import { api, type Health, type TaskDTO } from '../api.ts';
 import { AddTaskInline, TaskList } from '../components/TaskList.tsx';
-import { Empty, ErrorBox, Loading } from '../components/ui.tsx';
+import { Empty, ErrorBox, Loading, addDaysIso } from '../components/ui.tsx';
 import { SendToTodoistButton, isTodoistReady, useTodoistProjects } from '../components/Todoist.tsx';
 
 /**
@@ -130,11 +130,12 @@ export function BacklogPage() {
           <div className="small muted">Задача без даты попадёт в сегодняшнюю ежедневную заметку.</div>
           <AddTaskInline placeholder="Что сделать когда-нибудь…" />
         </section>
+        <RecentlyDone today={today} />
         <section className="card small">
           <strong>Как разбирать бэклог</strong>
           <p className="muted" style={{ marginBottom: 0 }}>
-            Назначьте срок кнопкой календаря у задачи, и она появится в разделе <Link to="/today">«Сегодня»</Link>. Если задача больше не нужна, отметьте её выполненной или
-            удалите строку в Obsidian.
+            Назначьте срок кнопкой календаря у задачи, и она появится в разделе <Link to="/today">«Сегодня»</Link>. Если задача больше не нужна, отметьте её выполненной кружком слева: она
+            уйдёт из бэклога в «Недавно выполненные», а в течение нескольких секунд её можно вернуть кнопкой «Отменить».
           </p>
           {todoistReady ? (
             <p className="muted">
@@ -147,5 +148,29 @@ export function BacklogPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+/** Задачи без срока, выполненные за последние 7 дней: видно, куда ушла отмеченная задача, и её можно вернуть. */
+function RecentlyDone({ today }: { today: string }) {
+  const q = useQuery({ queryKey: ['tasks', 'all'], queryFn: () => api.get<{ tasks: TaskDTO[] }>('/api/tasks?view=all') });
+  if (!q.data || !today) return null;
+  const from = addDaysIso(today, -7);
+  const list = q.data.tasks
+    .filter((t) => t.status === 'done' && !t.due && !t.scheduled && t.doneDate && t.doneDate >= from)
+    .sort((a, b) => (b.doneDate ?? '').localeCompare(a.doneDate ?? ''))
+    .slice(0, 20);
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h3 className="card-title">Недавно выполненные</h3>
+        <span className="card-sub">за 7 дней · {list.length}</span>
+      </div>
+      {list.length === 0 ? (
+        <div className="small muted">Пока ничего. Отмеченные кружком задачи появятся здесь, их можно вернуть повторным нажатием.</div>
+      ) : (
+        <TaskList tasks={list} today={today} />
+      )}
+    </section>
   );
 }

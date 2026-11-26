@@ -1,3 +1,4 @@
+import { NoteLinesCard } from '../components/NoteLines.tsx';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -7,6 +8,7 @@ import { AddTaskInline, TaskList } from '../components/TaskList.tsx';
 import { CreateEntityModal, EditEntityCard, RefLink, RelatedCard, SectionEditor } from '../components/Entities.tsx';
 import { Empty, ErrorBox, Loading, fmtDate, noteHref, plural, useToast } from '../components/ui.tsx';
 import { DOCUMENT_FIELDS, DOC_STATE_LABEL, DOC_TYPE_LABEL } from '../entities.ts';
+import { DeleteNoteButton } from '../components/DeleteNote.tsx';
 
 /** Дата с годом: у документов сроки бывают через много лет. */
 const fmtYear = (iso: string) => `${fmtDate(iso)} ${iso.slice(0, 4)}`;
@@ -205,6 +207,7 @@ export function DocumentPage() {
               <Link className="btn small" to={noteHref(d.path)}>
                 <FileText size={14} /> Заметка
               </Link>
+              <DeleteNoteButton path={d.path} title={d.title} after="/documents" />
             </div>
             <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', marginTop: 14 }}>
               <div className="stat">
@@ -263,6 +266,7 @@ export function DocumentPage() {
         </div>
         <div className="stack">
           <EditEntityCard path={d.path} defs={DOCUMENT_FIELDS} />
+          <NoteLinesCard path={d.path} />
           <RelatedCard related={d.related} emptyHint="Сошлитесь на документ из проекта или поездки: [[Название]]." />
         </div>
       </div>

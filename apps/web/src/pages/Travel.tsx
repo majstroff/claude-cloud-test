@@ -1,3 +1,4 @@
+import { NoteLinesCard } from '../components/NoteLines.tsx';
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -214,6 +215,7 @@ export function TripPage() {
           <DocumentsCard t={t} />
           <ExpensesCard t={t} />
           <EditEntityCard path={t.path} defs={TRIP_FIELDS} />
+          <NoteLinesCard path={t.path} />
           <RelatedCard related={t.related} emptyHint="Сошлитесь на поездку из цели, проекта или заметки." />
         </div>
       </div>

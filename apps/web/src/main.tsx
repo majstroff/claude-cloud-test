@@ -25,7 +25,12 @@ import { ItemPage } from './pages/Item.tsx';
 import { KnowledgeItemPage, KnowledgePage } from './pages/Knowledge.tsx';
 import { TravelPage, TripPage } from './pages/Travel.tsx';
 import { RelationshipsPage } from './pages/Relationships.tsx';
+import { JournalPage } from './pages/Journal.tsx';
+import { AssistantPage } from './pages/Assistant.tsx';
+import { installShellLinks } from './shell.ts';
 import './styles.css';
+
+installShellLinks();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -68,6 +73,8 @@ createRoot(document.getElementById('root')!).render(
               <Route path="travel" element={<TravelPage />} />
               <Route path="travel/view" element={<TripPage />} />
               <Route path="relationships" element={<RelationshipsPage />} />
+              <Route path="journal" element={<JournalPage />} />
+              <Route path="assistant" element={<AssistantPage />} />
               <Route path="item" element={<ItemPage />} />
               <Route path="note" element={<NotePage />} />
               <Route path="favorites" element={<FavoritesPage />} />

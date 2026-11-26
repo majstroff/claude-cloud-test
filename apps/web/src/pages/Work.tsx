@@ -1,3 +1,4 @@
+import { NoteLinesCard } from '../components/NoteLines.tsx';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -7,6 +8,7 @@ import { AddTaskInline, TaskList } from '../components/TaskList.tsx';
 import { CreateEntityModal, EditEntityCard, HistoryList, RefLink, RelatedCard, SectionEditor } from '../components/Entities.tsx';
 import { Empty, ErrorBox, Loading, fmtDate, noteHref, relDate, useToast } from '../components/ui.tsx';
 import { MATERIAL_FIELDS, VACANCY_ACTIVE, VACANCY_FIELDS, VACANCY_STATUSES, VACANCY_STATUS_LABEL, type VacancyStatus } from '../entities.ts';
+import { DeleteNoteButton } from '../components/DeleteNote.tsx';
 
 const FILTERS = ['active', ...VACANCY_STATUSES, 'all'] as const;
 
@@ -313,6 +315,7 @@ export function VacancyPage() {
               <Link className="btn small" to={noteHref(v.path)}>
                 <FileText size={14} /> Заметка
               </Link>
+              <DeleteNoteButton path={v.path} title={v.title} after="/work" />
             </div>
 
             <div className="steps" aria-label="Этапы">
@@ -433,6 +436,7 @@ export function VacancyPage() {
 
         <div className="stack">
           <EditEntityCard path={v.path} defs={VACANCY_FIELDS} />
+          <NoteLinesCard path={v.path} />
           <section className="card small">
             <div>Рекрутер: <RefLink r={v.recruiter} type="contact" /></div>
             <div>Резюме: <RefLink r={v.resume} type="resume" /></div>

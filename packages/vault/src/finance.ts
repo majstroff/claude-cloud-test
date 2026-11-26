@@ -48,9 +48,20 @@ export const INCOME_CATEGORIES = ['Зарплата', 'Фриланс', 'Про�
 const LEDGER_HEADER = '| Дата | Тип | Сумма | Категория | Описание | Связь |';
 const LEDGER_SEP = '|---|---|---:|---|---|---|';
 
+export interface TxInput {
+  date?: string | null;
+  kind: TxKind;
+  amount: number | string;
+  category?: string | null;
+  description?: string | null;
+  link?: string | null;
+}
+
 export interface TransactionDTO {
   path: string;
   line: number;
+  /** Строка таблицы как в файле — для правки и удаления без конфликтов. */
+  raw: string;
   date: string;
   kind: TxKind;
   amount: number;
@@ -244,6 +255,7 @@ export class Finance extends EntityModule {
       out.push({
         path: n.path,
         line: offset + i,
+        raw: line,
         date,
         kind,
         amount: Math.abs(amount),
@@ -274,27 +286,9 @@ export class Finance extends EntityModule {
   }
 
   /** Добавляет строку в таблицу операций месяца (создаёт заметку месяца при необходимости). */
-  async addTransaction(input: {
-    date?: string | null;
-    kind: TxKind;
-    amount: number | string;
-    category?: string | null;
-    description?: string | null;
-    link?: string | null;
-  }): Promise<TransactionDTO> {
-    if (!TX_KINDS.includes(input.kind)) throw new VaultError('Тип операции: доход, расход или накопления', 'invalid');
-    const date = this.checkDate(input.date, 'Дата операции');
-    const amount = parseNumber(input.amount);
-    if (amount === null || amount <= 0 || amount > 1e12) throw new VaultError('Сумма должна быть больше нуля', 'invalid');
-    const category = cell(input.category?.trim() || (input.kind === 'income' ? 'Другое' : input.kind === 'saving' ? 'Накопления' : 'Другое'));
-    const description = cell(input.description?.trim() ?? '');
-    let link = '';
-    if (input.link?.trim()) {
-      const l = linkOrText(this.vault, input.link.trim());
-      link = l.startsWith('[[') ? l.replace(/\|/g, '\\|') : cell(l);
-    }
+  async addTransaction(input: TxInput): Promise<TransactionDTO> {
+    const { date, row } = this.txRow(input);
     const note = await this.ensureLedger(date.slice(0, 7));
-    const row = `| ${date} | ${TX_KIND_LABEL[input.kind]} | ${formatAmount(amount)} | ${category} | ${description} | ${link} |`;
     let lineIndex = -1;
     const updated = await this.vault.transform(note.path, (text) => {
       const lines = text.split('\n');
@@ -311,6 +305,68 @@ export class Finance extends EntityModule {
     });
     const tx = this.parseLedger(updated).find((t) => t.line === lineIndex) ?? this.parseLedger(updated).at(-1);
     if (!tx) throw new VaultError('Операция записана, но не прочитана повторно', 'io');
+    return tx;
+  }
+
+  private txRow(input: TxInput): { date: string; row: string } {
+    if (!TX_KINDS.includes(input.kind)) throw new VaultError('Тип операции: доход, расход или накопления', 'invalid');
+    const date = this.checkDate(input.date, 'Дата операции');
+    const amount = parseNumber(input.amount);
+    if (amount === null || amount <= 0 || amount > 1e12) throw new VaultError('Сумма должна быть больше нуля', 'invalid');
+    const category = cell(input.category?.trim() || (input.kind === 'income' ? 'Другое' : input.kind === 'saving' ? 'Накопления' : 'Другое'));
+    const description = cell(input.description?.trim() ?? '');
+    let link = '';
+    if (input.link?.trim()) {
+      const l = linkOrText(this.vault, input.link.trim());
+      link = l.startsWith('[[') ? l.replace(/\|/g, '\\|') : cell(l);
+    }
+    return { date, row: `| ${date} | ${TX_KIND_LABEL[input.kind]} | ${formatAmount(amount)} | ${category} | ${description} | ${link} |` };
+  }
+
+  /** Находит строку операции; если файл менялся — ищет по точному тексту. */
+  private locateTx(lines: string[], line: number, raw: string): number {
+    if (lines[line] === raw) return line;
+    const found = lines.indexOf(raw);
+    if (found >= 0 && lines.indexOf(raw, found + 1) < 0) return found;
+    throw new VaultError('Операция изменилась в Obsidian. Обновите страницу и попробуйте ещё раз.', 'conflict');
+  }
+
+  private ledgerOf(rel: string): Note {
+    const n = this.vault.get(rel);
+    if (!n || n.type !== 'ledger') throw new VaultError('Заметка операций не найдена', 'not_found');
+    return n;
+  }
+
+  /** Удаляет строку операции из таблицы месяца. Возвращает удалённую операцию (для «Отменить»). */
+  async deleteTransaction(rel: string, line: number, raw: string): Promise<TransactionDTO> {
+    const n = this.ledgerOf(rel);
+    const before = this.parseLedger(n).find((t) => t.raw === raw);
+    if (!before) throw new VaultError('Это не строка операции', 'invalid');
+    await this.vault.transform(rel, (text) => {
+      const lines = text.split('\n');
+      lines.splice(this.locateTx(lines, line, raw), 1);
+      return lines.join('\n');
+    });
+    return before;
+  }
+
+  /** Изменяет операцию. Если сменился месяц — переносит её в заметку нового месяца. */
+  async updateTransaction(rel: string, line: number, raw: string, input: TxInput): Promise<TransactionDTO> {
+    const n = this.ledgerOf(rel);
+    const { date, row } = this.txRow(input);
+    if (fmStr(n.frontmatter.month) !== date.slice(0, 7)) {
+      await this.deleteTransaction(rel, line, raw);
+      return this.addTransaction(input);
+    }
+    let at = -1;
+    const updated = await this.vault.transform(rel, (text) => {
+      const lines = text.split('\n');
+      at = this.locateTx(lines, line, raw);
+      lines[at] = row;
+      return lines.join('\n');
+    });
+    const tx = this.parseLedger(updated).find((t) => t.line === at);
+    if (!tx) throw new VaultError('Операция изменена, но не прочитана повторно', 'io');
     return tx;
   }
 

@@ -197,6 +197,42 @@ try {
     await shot('backlog');
   });
 
+  await step('Бэклог: выполненная задача видна в «Недавно выполненных» и возвращается «Отменить»', async () => {
+    await page.goto(`${base}/backlog`);
+    const item = page.locator('li.task', { hasText: 'Получить три сметы' }).first();
+    await item.waitFor();
+    await item.getByRole('button', { name: 'Отметить выполненной' }).click();
+    await expectText('Выполнено: «Получить три сметы»');
+    const done = page.locator('section', { hasText: 'Недавно выполненные' }).locator('li.task', { hasText: 'Получить три сметы' });
+    await done.waitFor();
+    await page.getByRole('button', { name: 'Отменить' }).click();
+    await expectText('Задача снова в работе');
+    await done.waitFor({ state: 'detached' });
+    const raw = await fs.readFile(path.join(vault, 'Projects', 'Ремонт балкона.md'), 'utf8');
+    if (!/- \[ \] Получить три сметы/.test(raw)) throw new Error('Задача не вернулась в работу');
+  });
+
+  await step('Задачу можно переименовать, удалить и вернуть «Отменить»', async () => {
+    await page.goto(`${base}/backlog`);
+    const file = path.join(vault, 'Projects', 'Ремонт балкона.md');
+    const item = page.locator('li.task', { hasText: 'Получить три сметы' }).first();
+    await item.hover();
+    await item.getByRole('button', { name: 'Изменить задачу: Получить три сметы' }).click();
+    await page.getByLabel('Текст задачи').fill('Получить четыре сметы');
+    await page.getByRole('button', { name: 'Сохранить', exact: true }).click();
+    const renamed = page.locator('li.task', { hasText: 'Получить четыре сметы' }).first();
+    await renamed.waitFor();
+    if (!/- \[ \] Получить четыре сметы/.test(await fs.readFile(file, 'utf8'))) throw new Error('Текст задачи не изменён в файле');
+    await renamed.hover();
+    await renamed.getByRole('button', { name: 'Удалить задачу: Получить четыре сметы' }).click();
+    await renamed.getByRole('button', { name: 'Да, удалить' }).click();
+    await expectText('Задача удалена');
+    if ((await fs.readFile(file, 'utf8')).includes('Получить четыре сметы')) throw new Error('Задача не удалена');
+    await page.getByRole('button', { name: 'Отменить' }).click();
+    await expectText('Задача возвращена');
+    if (!(await fs.readFile(file, 'utf8')).includes('- [ ] Получить четыре сметы')) throw new Error('Задача не вернулась');
+  });
+
   await step('Работа: вакансия проходит по воронке, собеседование попадает в файл и календарь', async () => {
     await page.goto(`${base}/work`);
     await expectText('Product Manager — Acme');
@@ -310,6 +346,25 @@ try {
     await shot('finance');
   });
 
+  await step('Финансы: операцию можно изменить, удалить и вернуть «Отменить»', async () => {
+    const month = (await todayDate()).slice(0, 7);
+    const file = `Areas/Финансы/Операции/${month}.md`;
+    await page.getByRole('button', { name: 'Изменить операцию: E2E покупка' }).click();
+    const row = page.locator('tr', { has: page.getByRole('button', { name: 'Сохранить' }) });
+    await row.getByLabel('Сумма', { exact: true }).fill('2000');
+    await row.getByLabel('Описание', { exact: true }).fill('E2E покупка исправлена');
+    await row.getByRole('button', { name: 'Сохранить' }).click();
+    await expectText('Операция изменена');
+    if (!/\| 2000 \| Продукты \| E2E покупка исправлена \|/.test(await readVault(file))) throw new Error('Операция не изменена в файле');
+    await page.getByRole('button', { name: 'Удалить операцию: E2E покупка исправлена' }).click();
+    await page.getByRole('button', { name: 'Да, удалить' }).click();
+    await expectText('Операция удалена');
+    if ((await readVault(file)).includes('E2E покупка исправлена')) throw new Error('Операция не удалена из файла');
+    await page.getByRole('button', { name: 'Отменить' }).click();
+    await expectText('Операция возвращена');
+    if (!(await readVault(file)).includes('E2E покупка исправлена')) throw new Error('Операция не вернулась');
+  });
+
   await step('Финансы: оплата подписки переносит дату следующего платежа', async () => {
     const before = await readVault('Areas/Финансы/Подписки/Яндекс Плюс.md');
     const next = before.match(/next_payment: (\S+)/)[1];
@@ -350,6 +405,51 @@ try {
     const b = await readVault('Resources/Обучение/Книги/Inspired.md');
     if (!/progress: 180/.test(b)) throw new Error('Прогресс не записан');
     await shot('learning');
+  });
+
+  await step('Записи в заметке: цитату можно изменить, удалить и вернуть', async () => {
+    const rel = 'Resources/Обучение/Книги/Inspired.md';
+    await page.goto(`${base}/item?path=${encodeURIComponent(rel)}`);
+    await page.getByRole('button', { name: /Записи в заметке/ }).click();
+    await page.getByRole('button', { name: /^Изменить запись: Лучшие команды/ }).click();
+    await page.getByLabel('Текст записи').fill('Лучшие команды любят проблему. (с. 45)');
+    await page.getByLabel('Текст записи').press('Enter');
+    await expectText('Запись изменена');
+    if (!(await readVault(rel)).includes('> Лучшие команды любят проблему. (с. 45)')) throw new Error('Цитата не изменена');
+    await page.getByRole('button', { name: /^Удалить запись: Лучшие команды любят/ }).click();
+    await page.getByRole('button', { name: 'Да, удалить' }).click();
+    await expectText('Запись удалена');
+    if ((await readVault(rel)).includes('любят проблему')) throw new Error('Цитата не удалена');
+    await page.getByRole('button', { name: 'Отменить' }).click();
+    await expectText('Запись возвращена');
+    if (!(await readVault(rel)).includes('> Лучшие команды любят проблему. (с. 45)')) throw new Error('Цитата не вернулась');
+  });
+
+  await step('Обучение: аудиофайл прикрепляется, играет в плеере и удаляется с «Отменить»', async () => {
+    const rel = 'Resources/Обучение/Книги/Inspired.md';
+    // 0,5 секунды тишины в формате WAV.
+    const samples = 4000;
+    const wav = Buffer.alloc(44 + samples * 2);
+    wav.write('RIFF', 0); wav.writeUInt32LE(36 + samples * 2, 4); wav.write('WAVE', 8); wav.write('fmt ', 12);
+    wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(8000, 24);
+    wav.writeUInt32LE(16000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34); wav.write('data', 36); wav.writeUInt32LE(samples * 2, 40);
+    await page.goto(`${base}/item?path=${encodeURIComponent(rel)}`);
+    await page.getByLabel('Выбрать аудио или видео').setInputFiles({ name: 'Лекция E2E.wav', mimeType: 'audio/wav', buffer: wav });
+    await expectText('Прикреплено: Лекция E2E.wav');
+    const audio = page.getByLabel('Аудио: Лекция E2E');
+    await audio.waitFor();
+    const duration = await audio.evaluate((el) => new Promise((res) => (el.readyState >= 1 ? res(el.duration) : el.addEventListener('loadedmetadata', () => res(el.duration)))));
+    if (!(duration > 0.4 && duration < 0.6)) throw new Error(`Плеер не прочитал файл: ${duration}`);
+    await fs.access(path.join(vault, 'Resources/Вложения/Лекция E2E.wav'));
+    if (!(await readVault(rel)).includes('![[Лекция E2E.wav]]')) throw new Error('Ссылка на файл не записана в заметку');
+    await page.getByRole('button', { name: 'Удалить медиа: Лекция E2E' }).click();
+    await page.getByRole('button', { name: 'Да, удалить' }).click();
+    await expectText('Убрано: «Лекция E2E»');
+    await fs.access(path.join(vault, '.trash/Лекция E2E.wav'));
+    await page.getByRole('button', { name: 'Отменить' }).click();
+    await expectText('Возвращено');
+    await audio.waitFor();
+    await fs.access(path.join(vault, 'Resources/Вложения/Лекция E2E.wav'));
   });
 
   await step('Практики: запись попадает в ежедневную заметку', async () => {
@@ -434,6 +534,102 @@ try {
     await page.getByRole('button', { name: 'Идея', exact: true }).click();
     await expectText('Идея подарка записана');
     if (!(await readVault('Resources/Контакты/Мама.md')).includes('- Тёплый плед')) throw new Error('Идея не записана');
+  });
+
+  await step('Дневник: запись сохраняется в ежедневную заметку', async () => {
+    const today = await todayDate();
+    await page.goto(`${base}/journal`);
+    await page.getByLabel('Запись дневника').fill('E2E: день прошёл спокойно');
+    await page.getByRole('button', { name: 'Сохранить', exact: true }).click();
+    await expectText('Запись сохранена');
+    if (!(await readVault(`Daily/${today}.md`)).includes('## Дневник\nE2E: день прошёл спокойно')) throw new Error('Запись не попала в заметку');
+    await page.getByRole('button', { name: 'Настроение: 4' }).click();
+    await page.waitForFunction(async (d) => (await (await fetch(`/api/journal/entry?date=${d}`)).json()).mood === 4, today);
+    await shot('journal');
+  });
+
+  await step('Итоги недели: цифры, выводы и сохранение в Obsidian', async () => {
+    await page.goto(`${base}/journal?tab=reviews`);
+    await expectText('Выполненные задачи по дням');
+    await expectText('Выводы');
+    await page.getByLabel('Что получилось').fill('E2E: итог недели');
+    await page.getByRole('button', { name: 'Сохранить итоги в Obsidian' }).click();
+    await expectText('Итоги сохранены');
+    const r = await (await fetch(`${base}/api/reviews`)).json();
+    if (!r.reviews.length) throw new Error('Итоги не найдены');
+    const text = await readVault(r.reviews[0].path);
+    if (!/type: review/.test(text) || !text.includes('## Что получилось\nE2E: итог недели')) throw new Error('Заметка итогов неверная');
+    await page.getByRole('button', { name: 'Обновить итоги в Obsidian' }).waitFor();
+    await shot('review');
+  });
+
+  await step('Помощник: план дня записывает приоритеты только по кнопке', async () => {
+    const today = await todayDate();
+    const before = await readVault(`Daily/${today}.md`);
+    await page.goto(`${base}/assistant`);
+    await expectText('Главное (три дела)');
+    await expectText('Платный ИИ не подключён');
+    if ((await readVault(`Daily/${today}.md`)) !== before) throw new Error('Помощник изменил заметку без нажатия');
+    await page.getByRole('button', { name: /приоритеты дня/ }).click();
+    const confirm = page.getByRole('button', { name: 'Да, заменить' });
+    if (await confirm.isVisible().catch(() => false)) await confirm.click();
+    await expectText('Приоритеты записаны');
+    if (!/## Приоритеты\n1\. /.test(await readVault(`Daily/${today}.md`))) throw new Error('Приоритеты не записаны');
+    await shot('assistant-plan');
+  });
+
+  await step('Помощник: дела из заметки превращаются в задачи', async () => {
+    await page.goto(`${base}/note?path=${encodeURIComponent('Inbox/Заметки с созвона с Анной.md')}`);
+    await page.locator('a[href^="/assistant?tool=note"]').click();
+    await expectText('Узнать вилку зарплаты в Beta Bank');
+    await expectText('Связанные записи');
+    await page.getByRole('button', { name: 'Создать задачу' }).first().click();
+    await expectText('Задача создана');
+    const today = await todayDate();
+    if (!(await readVault(`Daily/${today}.md`)).includes('- [ ] Узнать вилку зарплаты в Beta Bank [[Заметки с созвона с Анной]]')) throw new Error('Задача не создана');
+    await shot('assistant-note');
+  });
+
+  await step('Помощник: просрочки и поиск работы', async () => {
+    await page.goto(`${base}/assistant?tool=overdue`);
+    await expectText('Разбор просрочек');
+    await page.goto(`${base}/assistant?tool=job`);
+    await expectText('Воронка');
+    await expectText('Тестовое до');
+  });
+
+  await step('Документы недоступны помощнику', async () => {
+    const r = await fetch(`${base}/api/assistant/related?path=${encodeURIComponent('Areas/Документы/РВП.md')}`);
+    if (r.status !== 403) throw new Error(`Ожидался отказ, получено ${r.status}`);
+  });
+
+  await step('Удаление заметки с подтверждением в корзину Obsidian', async () => {
+    await page.goto(`${base}/ideas`);
+    await page.getByRole('button', { name: 'Удалить: Telegram-канал о продуктовой аналитике' }).click();
+    await page.getByRole('button', { name: 'Да, удалить' }).click();
+    await expectText('лежит в корзине Obsidian');
+    await fs.access(path.join(vault, '.trash/Telegram-канал о продуктовой аналитике.md'));
+    if ((await page.getByText('Telegram-канал о продуктовой аналитике').count()) > 0) throw new Error('Идея осталась в списке');
+  });
+
+  await step('Окно программы: внешняя ссылка уходит в браузер по умолчанию, а не в новое окно', async () => {
+    const opened = [];
+    await page.route('**/api/open-external', async (route) => {
+      opened.push(route.request().postDataJSON().url);
+      await route.fulfill({ json: { ok: true } });
+    });
+    const popups = [];
+    const onPopup = (p) => popups.push(p);
+    page.on('popup', onPopup);
+    await page.goto(`${base}/work/view?path=${encodeURIComponent('Areas/Работа/Вакансии/Product Manager — Acme.md')}&shell=mac`);
+    if (new URL(page.url()).searchParams.has('shell')) throw new Error('Параметр shell остался в адресе');
+    await page.getByRole('link', { name: 'Вакансия' }).click();
+    await page.waitForTimeout(300);
+    page.off('popup', onPopup);
+    await page.unroute('**/api/open-external');
+    if (opened[0] !== 'https://example.com/jobs/acme-pm') throw new Error(`open-external: ${JSON.stringify(opened)}`);
+    if (popups.length) throw new Error('Открылось новое окно браузера');
+    await page.evaluate(() => sessionStorage.removeItem('frame-shell'));
   });
 
   await step('Тёмная тема и мобильная ширина', async () => {

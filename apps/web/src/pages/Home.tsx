@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, BellRing, CalendarClock, CheckCircle2, Dumbbell, FolderKanban, Repeat, Target, Wallet } from 'lucide-react';
+import { ArrowRight, BellRing, CalendarClock, CheckCircle2, Dumbbell, FolderKanban, Repeat, Target, Wallet, NotebookPen } from 'lucide-react';
 import { entityHref } from '../entities.ts';
 import { api, type Dashboard, type CycleDTO } from '../api.ts';
 import { AddTaskInline, TaskList } from '../components/TaskList.tsx';
@@ -137,16 +137,39 @@ export function HomePage() {
               <h2 className="card-title">
                 <Target size={16} /> Приоритеты дня
               </h2>
-              <Link to="/today" className="btn small ghost">
-                Изменить
-              </Link>
+              <div className="row" style={{ gap: 4 }}>
+                <Link to="/assistant" className="btn small ghost">
+                  Предложить
+                </Link>
+                <Link to="/today" className="btn small ghost">
+                  Изменить
+                </Link>
+              </div>
             </div>
             {d.priorities.trim() ? (
               <div style={{ whiteSpace: 'pre-wrap' }}>{d.priorities}</div>
             ) : (
-              <Empty title="Приоритеты не заданы">Выберите 1–3 главных дела в разделе «Сегодня».</Empty>
+              <Empty title="Приоритеты не заданы" action={<Link className="btn small" to="/assistant">Составить план дня</Link>}>
+                Выберите 1–3 главных дела в разделе «Сегодня» или попросите помощника.
+              </Empty>
             )}
           </section>
+          {d.journal && (
+            <section className="card">
+              <div className="card-head">
+                <h2 className="card-title">
+                  <NotebookPen size={16} /> Дневник
+                </h2>
+                <Link to="/journal" className="btn small ghost">
+                  {d.journal.writtenToday ? 'Открыть' : 'Написать'}
+                </Link>
+              </div>
+              <div className="small muted">
+                {d.journal.writtenToday ? 'Запись за сегодня есть.' : 'Сегодня записи ещё нет.'}
+                {d.journal.streak > 0 && ` Серия: ${d.journal.streak} ${plural(d.journal.streak, 'день', 'дня', 'дней')}.`}
+              </div>
+            </section>
+          )}
           <section className="card">
             <MonthCalendar anchor={anchor ?? d.today} today={d.today} onAnchor={setAnchor} onSelect={(date) => nav(`/today?date=${date}`)} />
           </section>
@@ -293,7 +316,7 @@ function Stat({ value, label, to, tone }: { value: number; label: string; to: st
   return (
     <Link to={to} className="card" style={{ padding: 16 }}>
       <div style={{ fontSize: 28, fontWeight: 500, letterSpacing: '-0.02em', color: tone }}>{value}</div>
-      <div className="small muted">{label}</div>
+      <div style={{ fontSize: 14, color: 'var(--text-2)', marginTop: 2 }}>{label}</div>
     </Link>
   );
 }

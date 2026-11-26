@@ -72,6 +72,25 @@ describe('Life: задачи', () => {
     ).rejects.toMatchObject({ code: 'conflict' });
   });
 
+  it('меняет текст задачи, сохраняя срок и приоритет; удаляет и возвращает задачу', async () => {
+    const { life, dir } = await openSample();
+    const t = await life.createTask({ text: 'Купить молоко', due: 'завтра', priority: 'medium' });
+    const renamed = await life.updateTask({ path: t.path, line: t.line, raw: t.raw, action: 'rename', text: '  Купить  кефир ' });
+    expect(renamed).toMatchObject({ title: 'Купить кефир', due: '2026-11-25', priority: 'medium' });
+    expect(await fs.readFile(path.join(dir, t.path), 'utf8')).toContain('- [ ] Купить кефир 🔼 📅 2026-11-25');
+    await expect(life.updateTask({ path: t.path, line: renamed.line, raw: renamed.raw, action: 'rename', text: ' ' })).rejects.toThrow(/пустым/);
+
+    const before = await fs.readFile(path.join(dir, t.path), 'utf8');
+    const deleted = await life.deleteTask({ path: renamed.path, line: renamed.line, raw: renamed.raw });
+    const after = await fs.readFile(path.join(dir, t.path), 'utf8');
+    expect(after).not.toContain('Купить кефир');
+    expect(after.split('\n').length).toBe(before.split('\n').length - 1);
+    const restored = await life.restoreTask(deleted);
+    expect(restored.title).toBe('Купить кефир');
+    expect(await fs.readFile(path.join(dir, t.path), 'utf8')).toBe(before);
+    await expect(life.deleteTask({ path: t.path, line: 0, raw: '- [ ] нет такой' })).rejects.toMatchObject({ code: 'conflict' });
+  });
+
   it('быстрый ввод понимает дату и приоритет в конце строки', async () => {
     const { life } = await openSample();
     const r = await life.quickAdd({ kind: 'task', text: 'Отправить отчёт завтра !1' });

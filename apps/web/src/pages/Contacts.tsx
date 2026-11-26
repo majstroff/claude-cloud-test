@@ -1,3 +1,4 @@
+import { NoteLinesCard } from '../components/NoteLines.tsx';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,6 +10,7 @@ import { Empty, ErrorBox, Loading, fmtDate, noteHref, plural, relDate, useToast 
 import { COMPANY_FIELDS, COMPANY_KIND_LABEL, CONTACT_FIELDS, CONTACT_KIND_LABEL, RELATION_STATUS_LABEL, entityHref } from '../entities.ts';
 import { VacancyStatusChip } from './Work.tsx';
 import { PersonRelationsCard } from '../components/Personal.tsx';
+import { DeleteNoteButton } from '../components/DeleteNote.tsx';
 
 type ContactsData = { today: string; contacts: ContactDTO[]; companies: CompanyDTO[] };
 
@@ -282,6 +284,7 @@ export function ContactPage() {
               <Link className="btn small" to={noteHref(c.path)}>
                 <FileText size={14} /> Заметка
               </Link>
+              <DeleteNoteButton path={c.path} title={c.title} after="/contacts" />
             </div>
             <div className="row" style={{ marginTop: 12 }}>
               {c.phone && (
@@ -351,6 +354,7 @@ export function ContactPage() {
             </section>
           )}
           <EditEntityCard path={c.path} defs={CONTACT_FIELDS} />
+          <NoteLinesCard path={c.path} />
           <RelatedCard related={c.related} emptyHint="Упомяните контакт в проекте или задаче: [[Имя]]." />
         </div>
       </div>
@@ -393,6 +397,7 @@ export function CompanyPage() {
               <Link className="btn small" to={noteHref(c.path)}>
                 <FileText size={14} /> Заметка
               </Link>
+              <DeleteNoteButton path={c.path} title={c.title} after="/contacts" />
             </div>
           </section>
           <div className="grid cols-2">
@@ -454,6 +459,7 @@ export function CompanyPage() {
         <div className="stack">
           <LogInteraction path={c.path} today={today} withNext={false} />
           <EditEntityCard path={c.path} defs={COMPANY_FIELDS} />
+          <NoteLinesCard path={c.path} />
           <RelatedCard related={c.related} emptyHint="Свяжите компанию с проектом, контактами и документами." />
         </div>
       </div>

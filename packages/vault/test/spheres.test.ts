@@ -63,6 +63,27 @@ describe('Финансы', () => {
     await expect(sp.finance.addTransaction({ kind: 'expense', amount: 0 })).rejects.toThrow(/больше нуля/);
   });
 
+  it('изменяет и удаляет операцию; при смене месяца переносит её', async () => {
+    const { sp, dir } = await setup();
+    const tx = await sp.finance.addTransaction({ kind: 'expense', amount: 1500, category: 'Продукты', description: 'Тестовая покупка' });
+    const edited = await sp.finance.updateTransaction(tx.path, tx.line, tx.raw, { kind: 'expense', amount: '1700', category: 'Кафе', description: 'Обед', date: '2026-11-20' });
+    expect(edited).toMatchObject({ amount: 1700, category: 'Кафе', description: 'Обед', date: '2026-11-20', line: tx.line });
+    let file = await read(dir, 'Areas/Финансы/Операции/2026-11.md');
+    expect(file).toContain('| 2026-11-20 | Расход | 1700 | Кафе | Обед |');
+    expect(file).not.toContain('Тестовая покупка');
+    await expect(sp.finance.updateTransaction(tx.path, tx.line, tx.raw, { kind: 'expense', amount: 1 })).rejects.toMatchObject({ code: 'conflict' });
+
+    const moved = await sp.finance.updateTransaction(edited.path, edited.line, edited.raw, { kind: 'expense', amount: 1700, category: 'Кафе', description: 'Обед', date: '2026-12-01' });
+    expect(moved.path).toBe('Areas/Финансы/Операции/2026-12.md');
+    expect(await read(dir, 'Areas/Финансы/Операции/2026-11.md')).not.toContain('Обед');
+
+    const del = await sp.finance.deleteTransaction(moved.path, moved.line, moved.raw);
+    expect(del).toMatchObject({ amount: 1700, description: 'Обед' });
+    file = await read(dir, 'Areas/Финансы/Операции/2026-12.md');
+    expect(file).not.toContain('Обед');
+    await expect(sp.finance.deleteTransaction('Projects/Ремонт балкона.md', 0, 'x')).rejects.toMatchObject({ code: 'not_found' });
+  });
+
   it('оплата подписки переносит дату списания и пишет расход', async () => {
     const { sp, vault } = await setup();
     const rel = 'Areas/Финансы/Подписки/Яндекс Плюс.md';
@@ -394,5 +415,45 @@ describe('Главная и «Сегодня»', () => {
     expect(future.routines.map((r) => r.title)).toContain('Утренняя медитация');
     expect(future.routines.map((r) => r.title)).not.toContain('Генеральная уборка');
     expect(sp.day('2026-11-30').routines.map((r) => r.title)).toContain('Генеральная уборка');
+  });
+});
+
+describe('Чтение и обучение: видео и аудио', () => {
+  it('распознаёт ссылки YouTube, Rutube и Vimeo', async () => {
+    const { videoEmbed } = await import('../src/learning.ts');
+    expect(videoEmbed('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42')).toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=42');
+    expect(videoEmbed('https://youtu.be/dQw4w9WgXcQ')).toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+    expect(videoEmbed('https://vimeo.com/76979871')).toBe('https://player.vimeo.com/video/76979871');
+    expect(videoEmbed('https://rutube.ru/video/0123456789abcdef0123456789abcdef/')).toBe('https://rutube.ru/play/embed/0123456789abcdef0123456789abcdef');
+    expect(videoEmbed('https://example.com/podcast.mp3')).toBeNull();
+  });
+
+  it('прикрепляет файл, добавляет ссылку, удаляет в корзину и возвращает', async () => {
+    const { Readable } = await import('node:stream');
+    const { sp, dir } = await setup();
+    const rel = 'Resources/Обучение/Книги/Inspired.md';
+    const items = await sp.learning.attachMedia(rel, 'Лекция 1: введение.mp3', Readable.from([Buffer.from('ID3 test audio')]), 'Первая лекция');
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ kind: 'audio', title: 'Первая лекция', file: 'Resources/Вложения/Лекция 1 введение.mp3', missing: false });
+    expect(await read(dir, rel)).toContain('## Медиа\n- ![[Лекция 1 введение.mp3|Первая лекция]]');
+    expect(await fs.readFile(path.join(dir, 'Resources/Вложения/Лекция 1 введение.mp3'), 'utf8')).toBe('ID3 test audio');
+    // Второй файл с тем же именем не затирает первый.
+    const again = await sp.learning.attachMedia(rel, 'Лекция 1: введение.mp3', Readable.from([Buffer.from('second')]));
+    expect(again.map((m) => m.file)).toContain('Resources/Вложения/Лекция 1 введение 2.mp3');
+    await expect(sp.learning.attachMedia(rel, 'virus.exe', Readable.from([Buffer.from('x')]))).rejects.toThrow(/аудио/);
+    await expect(sp.learning.attachMedia(rel, 'empty.mp4', Readable.from([Buffer.alloc(0)]))).rejects.toThrow(/пустой/);
+
+    const withLink = await sp.learning.addMediaLink(rel, { url: 'https://youtu.be/dQw4w9WgXcQ', title: 'Доклад Кагана' });
+    expect(withLink.at(-1)).toMatchObject({ kind: 'embed', title: 'Доклад Кагана', embed: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ' });
+    await expect(sp.learning.addMediaLink(rel, { url: 'javascript:alert(1)' })).rejects.toThrow(/http/);
+
+    const first = withLink[0]!;
+    const del = await sp.learning.removeMedia(rel, { line: first.line, raw: first.raw });
+    expect(del.trashed).toEqual({ from: 'Resources/Вложения/Лекция 1 введение.mp3', to: '.trash/Лекция 1 введение.mp3' });
+    await expect(fs.access(path.join(dir, 'Resources/Вложения/Лекция 1 введение.mp3'))).rejects.toThrow();
+    expect(await read(dir, rel)).not.toContain('Первая лекция');
+    const back = await sp.learning.restoreMedia(rel, del);
+    expect(back[0]).toMatchObject({ title: 'Первая лекция', missing: false });
+    expect(await fs.readFile(path.join(dir, 'Resources/Вложения/Лекция 1 введение.mp3'), 'utf8')).toBe('ID3 test audio');
   });
 });

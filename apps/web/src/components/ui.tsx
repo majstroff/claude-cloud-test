@@ -58,14 +58,14 @@ interface Toast {
   text: ReactNode;
   kind: 'info' | 'error';
 }
-const ToastCtx = createContext<(text: ReactNode, kind?: 'info' | 'error') => void>(() => {});
+const ToastCtx = createContext<(text: ReactNode, kind?: 'info' | 'error', ms?: number) => void>(() => {});
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const push = useCallback((text: ReactNode, kind: 'info' | 'error' = 'info') => {
+  const push = useCallback((text: ReactNode, kind: 'info' | 'error' = 'info', ms?: number) => {
     const id = Date.now() + Math.random();
     setToasts((t) => [...t, { id, text, kind }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === 'error' ? 7000 : 3500);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ms ?? (kind === 'error' ? 7000 : 3500));
   }, []);
   return (
     <ToastCtx.Provider value={push}>

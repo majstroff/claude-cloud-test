@@ -13,6 +13,8 @@ import {
   setTaskDueLine,
   setTaskPriorityLine,
   setTaskTodoistLine,
+  setTaskTextLine,
+  parseTaskLine,
   type Priority,
 } from './tasks.ts';
 import { Vault, VaultError, summarize, type Note, type NoteSummary, type VaultTask } from './vault.ts';
@@ -170,7 +172,8 @@ export class Life {
     path: string;
     line: number;
     raw: string;
-    action: 'complete' | 'reopen' | 'setDue' | 'setPriority' | 'setTodoist';
+    action: 'complete' | 'reopen' | 'setDue' | 'setPriority' | 'setTodoist' | 'rename';
+    text?: string;
     due?: string | null;
     priority?: Priority;
     todoistId?: string | null;
@@ -196,10 +199,37 @@ export class Life {
           return setTaskPriorityLine(raw, input.priority ?? 'none');
         case 'setTodoist':
           return setTaskTodoistLine(raw, input.todoistId ?? null);
+        case 'rename':
+          return setTaskTextLine(raw, input.text ?? '');
       }
     });
     const task = note.tasks.find((t) => t.line === line);
     if (!task) throw new VaultError('Задача не найдена после изменения', 'io');
+    return this.toDTO(task);
+  }
+
+  /** Удаляет строку задачи из заметки. Возвращает, где она была, — для «Отменить». */
+  async deleteTask(input: { path: string; line: number; raw: string }): Promise<{ path: string; line: number; raw: string }> {
+    let at = input.line;
+    await this.vault.editTaskLine(input.path, input.line, input.raw, (raw) => {
+      if (!parseTaskLine(raw)) throw new VaultError('Это не строка задачи', 'invalid');
+      return [];
+    }).then((r) => (at = r.line + 1));
+    return { path: input.path, line: at, raw: input.raw };
+  }
+
+  /** Возвращает удалённую строку задачи на прежнее место. */
+  async restoreTask(input: { path: string; line: number; raw: string }): Promise<TaskDTO> {
+    if (!parseTaskLine(input.raw)) throw new VaultError('Это не строка задачи', 'invalid');
+    let at = 0;
+    const note = await this.vault.transform(input.path, (content) => {
+      const lines = content.split('\n');
+      at = Math.max(0, Math.min(input.line, lines.length));
+      lines.splice(at, 0, input.raw);
+      return lines.join('\n');
+    });
+    const task = note.tasks.find((t) => t.line === at);
+    if (!task) throw new VaultError('Задача не найдена после восстановления', 'io');
     return this.toDTO(task);
   }
 

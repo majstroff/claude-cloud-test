@@ -1,3 +1,4 @@
+import { VaultError } from './vault.ts';
 import { addDays, addMonths, isIsoDate } from './dates.ts';
 
 /**
@@ -198,6 +199,21 @@ export function setTaskPriorityLine(line: string, priority: Priority): string {
 }
 
 /** Помечает строку задачи как отправленную в Todoist: [todoist:: <id>]. */
+/** Меняет текст задачи, сохраняя флажок, даты, приоритет и повтор. */
+export function setTaskTextLine(line: string, title: string): string {
+  const m = TASK_LINE.exec(line);
+  const parsed = parseTaskLine(line);
+  if (!m || !parsed) throw new VaultError('Это не строка задачи', 'invalid');
+  const next = title.replace(/\s+/g, ' ').trim();
+  if (!next) throw new VaultError('Текст задачи не может быть пустым', 'invalid');
+  const rest = m[4] ?? '';
+  const prefix = line.slice(0, line.length - rest.length);
+  if (!parsed.title) return `${prefix}${next} ${rest}`.replace(/\s+$/, '');
+  const at = rest.indexOf(parsed.title);
+  if (at < 0) throw new VaultError('Не удалось найти текст задачи в строке. Измените его в Obsidian.', 'conflict');
+  return prefix + rest.slice(0, at) + next + rest.slice(at + parsed.title.length);
+}
+
 export function setTaskTodoistLine(line: string, todoistId: string | null): string {
   if (todoistId !== null && !/^[\w-]+$/.test(todoistId)) throw new Error(`Некорректный id Todoist: ${todoistId}`);
   let out = line.replace(/\s*\[todoist::[^\]]*\]/gi, '');

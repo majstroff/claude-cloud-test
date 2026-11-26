@@ -9,7 +9,7 @@ import {
   Briefcase,
   Dumbbell,
   Flower2,
-  House,
+  Sofa,
   Wallet,
   CalendarDays,
   FileLock2,
@@ -26,29 +26,56 @@ import {
   Sun,
   SunMoon,
   Target,
+  NotebookPen,
+  WandSparkles,
 } from 'lucide-react';
 import { api, type Dashboard, type Priority, type SearchResult, type NoteSummary } from '../api.ts';
 import { TYPE_LABEL, noteHref, useTheme, useToast, fmtDate } from './ui.tsx';
 import { entityHref } from '../entities.ts';
 
-const NAV = [
-  { to: '/', label: 'Главная', icon: Home, end: true },
-  { to: '/today', label: 'Сегодня', icon: CalendarDays },
-  { to: '/strategy', label: 'Стратегия', icon: Target },
-  { to: '/projects', label: 'Проекты', icon: FolderKanban },
-  { to: '/backlog', label: 'Бэклог', icon: Inbox, badge: 'backlog' as const },
-  { to: '/ideas', label: 'Идеи', icon: Lightbulb, badge: 'ideas' as const },
-  { to: '/work', label: 'Работа', icon: Briefcase },
-  { to: '/contacts', label: 'Контакты', icon: Users, badge: 'followups' as const },
-  { to: '/documents', label: 'Документы', icon: FileLock2, badge: 'documents' as const },
-  { to: '/finance', label: 'Финансы', icon: Wallet, badge: 'payments' as const },
-  { to: '/health', label: 'Спорт и здоровье', icon: Dumbbell },
-  { to: '/learning', label: 'Чтение и обучение', icon: BookOpen },
-  { to: '/practices', label: 'Практики', icon: Flower2 },
-  { to: '/home', label: 'Дом', icon: House },
-  { to: '/knowledge', label: 'Знания', icon: BookMarked },
-  { to: '/travel', label: 'Путешествия', icon: Plane },
-  { to: '/relationships', label: 'Отношения', icon: Heart, badge: 'occasions' as const },
+type NavItem = { to: string; label: string; icon: typeof Home; end?: boolean; badge?: 'backlog' | 'ideas' | 'followups' | 'documents' | 'payments' | 'occasions' };
+
+/** Разделы, сгруппированные по смыслу; между группами — разделители. */
+const NAV_GROUPS: Array<{ title: string; items: NavItem[] }> = [
+  {
+    title: 'Главное',
+    items: [
+      { to: '/', label: 'Главная', icon: Home, end: true },
+      { to: '/today', label: 'Сегодня', icon: CalendarDays },
+      { to: '/strategy', label: 'Стратегия', icon: Target },
+      { to: '/projects', label: 'Проекты', icon: FolderKanban },
+      { to: '/backlog', label: 'Бэклог', icon: Inbox, badge: 'backlog' },
+      { to: '/ideas', label: 'Идеи', icon: Lightbulb, badge: 'ideas' },
+    ],
+  },
+  {
+    title: 'Дневник и помощник',
+    items: [
+      { to: '/journal', label: 'Дневник и итоги', icon: NotebookPen },
+      { to: '/assistant', label: 'Помощник', icon: WandSparkles },
+    ],
+  },
+  {
+    title: 'Работа и люди',
+    items: [
+      { to: '/work', label: 'Работа', icon: Briefcase },
+      { to: '/contacts', label: 'Контакты', icon: Users, badge: 'followups' },
+      { to: '/documents', label: 'Документы', icon: FileLock2, badge: 'documents' },
+    ],
+  },
+  {
+    title: 'Сферы жизни',
+    items: [
+      { to: '/finance', label: 'Финансы', icon: Wallet, badge: 'payments' },
+      { to: '/health', label: 'Спорт и здоровье', icon: Dumbbell },
+      { to: '/practices', label: 'Практики', icon: Flower2 },
+      { to: '/learning', label: 'Чтение и обучение', icon: BookOpen },
+      { to: '/knowledge', label: 'Знания', icon: BookMarked },
+      { to: '/home', label: 'Дом', icon: Sofa },
+      { to: '/travel', label: 'Путешествия', icon: Plane },
+      { to: '/relationships', label: 'Отношения', icon: Heart, badge: 'occasions' },
+    ],
+  },
 ];
 
 const TITLES: Record<string, string> = {
@@ -76,6 +103,8 @@ const TITLES: Record<string, string> = {
   '/travel': 'Путешествия',
   '/travel/view': 'Поездка',
   '/relationships': 'Отношения',
+  '/journal': 'Дневник и итоги',
+  '/assistant': 'Помощник',
   '/item': 'Запись',
   '/note': 'Заметка',
   '/favorites': 'Избранное',
@@ -87,6 +116,30 @@ export function Layout() {
   const [quickOpen, setQuickOpen] = useState(false);
   const [theme, setTheme] = useTheme();
   const loc = useLocation();
+  const [tip, setTip] = useState<{ label: string; group?: string; y: number } | null>(null);
+  useEffect(() => setTip(null), [loc.pathname]);
+  // Если все разделы не помещаются по высоте, рейка прокручивается, а край плавно гаснет.
+  const railRef = useRef<HTMLElement>(null);
+  const [railFade, setRailFade] = useState('');
+  const updateRailFade = () => {
+    const el = railRef.current;
+    if (!el || el.scrollHeight <= el.clientHeight + 1) return setRailFade('');
+    const top = el.scrollTop > 2;
+    const bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 2;
+    setRailFade(top && bottom ? 'fade-both' : top ? 'fade-top' : bottom ? 'fade-bottom' : '');
+  };
+  useEffect(() => {
+    updateRailFade();
+    window.addEventListener('resize', updateRailFade);
+    return () => window.removeEventListener('resize', updateRailFade);
+  }, []);
+  const tipProps = (label: string, group?: string) => {
+    const show = (e: { currentTarget: HTMLElement }) => {
+      const r = e.currentTarget.getBoundingClientRect();
+      setTip({ label, group, y: r.top + r.height / 2 });
+    };
+    return { onMouseEnter: show, onFocus: show, onMouseLeave: () => setTip(null), onBlur: () => setTip(null) };
+  };
   const dash = useQuery({ queryKey: ['dashboard'], queryFn: () => api.get<Dashboard>('/api/dashboard') });
   const live = useLiveUpdates();
 
@@ -122,28 +175,35 @@ export function Layout() {
 
   return (
     <div className="shell">
-      <nav className="rail" aria-label="Разделы">
-        {NAV.map((n) => (
-          <NavLink key={n.to} to={n.to} end={n.end} aria-label={n.label}>
-            <n.icon size={18} />
-            {n.badge && badges[n.badge] > 0 && <span className="badge">{badges[n.badge]}</span>}
-            <span className="tip">{n.label}</span>
-          </NavLink>
+      <nav ref={railRef} className={`rail ${railFade}`} aria-label="Разделы" onScroll={() => { setTip(null); updateRailFade(); }}>
+        {NAV_GROUPS.map((g, gi) => (
+          <div key={g.title} role="group" aria-label={g.title} style={{ display: 'contents' }}>
+            {gi > 0 && <div className="sep" />}
+            {g.items.map((n) => (
+              <NavLink key={n.to} to={n.to} end={n.end} aria-label={n.label} {...tipProps(n.label, g.title)}>
+                <n.icon size={22} />
+                {n.badge && badges[n.badge] > 0 && <span className="badge">{badges[n.badge]}</span>}
+              </NavLink>
+            ))}
+          </div>
         ))}
         <div className="sep" />
-        <NavLink to="/favorites" aria-label="Избранное">
-          <Star size={18} />
-          <span className="tip">Избранное</span>
+        <NavLink to="/favorites" aria-label="Избранное" {...tipProps('Избранное')}>
+          <Star size={22} />
         </NavLink>
-        <button aria-label="Быстрый ввод" onClick={() => setQuickOpen(true)}>
-          <Plus size={18} />
-          <span className="tip">Быстрый ввод (N)</span>
+        <button aria-label="Быстрый ввод" onClick={() => setQuickOpen(true)} {...tipProps('Быстрый ввод', 'клавиша N')}>
+          <Plus size={22} />
         </button>
-        <NavLink to="/settings" aria-label="Настройки">
-          <Settings size={18} />
-          <span className="tip">Настройки и статус</span>
+        <NavLink to="/settings" aria-label="Настройки" {...tipProps('Настройки и статус')}>
+          <Settings size={22} />
         </NavLink>
       </nav>
+      {tip && (
+        <div className="rail-tip" style={{ top: tip.y }} role="tooltip">
+          {tip.label}
+          {tip.group && <small>{tip.group}</small>}
+        </div>
+      )}
 
       <main className="main">
         <header className="topbar">

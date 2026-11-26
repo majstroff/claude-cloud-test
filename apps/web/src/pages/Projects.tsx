@@ -6,6 +6,7 @@ import { api, type Health, type ProjectDTO, type ProjectDetail, type Strategy } 
 import { AddTaskInline, TaskList } from '../components/TaskList.tsx';
 import { Empty, ErrorBox, Loading, Progress, STATUS_LABEL, StatusChip, TYPE_LABEL, noteHref, relDate, useToast } from '../components/ui.tsx';
 import { Modal } from '../components/Layout.tsx';
+import { DeleteNoteButton } from '../components/DeleteNote.tsx';
 
 export function useFavorite() {
   const qc = useQueryClient();
@@ -259,6 +260,7 @@ export function ProjectPage() {
               <Link className="btn small" to={noteHref(p.path)}>
                 <FileText size={14} /> Заметка
               </Link>
+              <DeleteNoteButton path={p.path} title={p.title} after="/projects" />
             </div>
             <div style={{ margin: '16px 0 8px' }}>
               <Progress value={p.progress} tone="blue" />

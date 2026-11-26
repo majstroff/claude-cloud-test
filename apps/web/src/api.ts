@@ -17,7 +17,20 @@ import type {
   MaterialDTO,
   HistoryEntry,
   Ref,
+  JournalEntrySummary,
+  PeriodStats,
+  Insight,
+  ReviewDTO,
+  ReviewPeriod,
+  AssistantAction,
+  AssistantEngine,
+  ScoredTask,
+  Advice,
+  StateEntry,
+  PracticeEntry,
 } from '@frame-os/vault';
+
+export type { JournalEntrySummary, PeriodStats, Insight, ReviewDTO, ReviewPeriod, AssistantAction, AssistantEngine, ScoredTask, Advice };
 
 export type { VacancyDTO, ContactDTO, CompanyDTO, DocumentDTO, MaterialDTO, HistoryEntry, Ref };
 
@@ -82,6 +95,7 @@ export interface Health {
 }
 
 export interface Dashboard {
+  journal?: { streak: number; writtenToday: boolean };
   today: string;
   todayTasks: TaskDTO[];
   overdue: TaskDTO[];
@@ -249,3 +263,92 @@ export type BookingDetail = ReturnType<Travel['bookingDetail']>;
 export type RelationsData = ReturnType<Relationships['overview']>;
 export type DateDetail = ReturnType<Relationships['dateDetail']>;
 export type PersonDetail = ReturnType<Relationships['personDetail']>;
+
+// ---------- Дневник, итоги, помощник ----------
+
+export interface JournalData {
+  today: string;
+  from: string;
+  to: string;
+  entries: JournalEntrySummary[];
+  streak: number;
+  reviews: ReviewDTO[];
+}
+
+export interface JournalEntry {
+  date: string;
+  isToday: boolean;
+  notePath: string;
+  exists: boolean;
+  hash: string | null;
+  text: string;
+  review: string;
+  gratitude: string[];
+  mood: number | null;
+  energy: number | null;
+  states: StateEntry[];
+  practices: PracticeEntry[];
+  done: TaskDTO[];
+  prev: string | null;
+  next: string | null;
+  prompts: string[];
+}
+
+export interface AnalyticsData {
+  stats: PeriodStats;
+  prev: PeriodStats;
+  insights: Insight[];
+}
+
+export interface ReviewDraft extends AnalyticsData {
+  existing: ReviewDTO | null;
+  title: string;
+  auto: Record<string, string>;
+  human: Record<string, string>;
+}
+
+export interface AssistantInfo {
+  engine: AssistantEngine;
+  engines: AssistantEngine[];
+  note: string;
+}
+
+export interface DayPlan {
+  date: string;
+  currentPriorities: string;
+  fixed: Array<{ title: string; time: string | null; kind: string; path: string | null }>;
+  focus: ScoredTask[];
+  more: ScoredTask[];
+  overload: ScoredTask[];
+  warnings: string[];
+  prioritiesText: string;
+  actions: AssistantAction[];
+}
+
+export interface OverdueReport {
+  total: number;
+  groups: Array<{ id: string; title: string; hint: string; items: ScoredTask[] }>;
+  hotspots: Array<{ title: string; path: string; count: number }>;
+  summary: string[];
+}
+
+export interface JobReport {
+  funnel: Record<string, number>;
+  summary: string[];
+  advice: Advice[];
+}
+
+export interface NoteTasksReport {
+  path: string;
+  title: string;
+  candidates: Array<{ line: number; source: string; text: string; due: string | null }>;
+  actions: AssistantAction[];
+}
+
+export interface RelatedReport {
+  path: string;
+  title: string;
+  items: Array<{ note: NoteSummary; score: number; reasons: string[] }>;
+}
+
+export type NextStep = Advice & { kind: string };
