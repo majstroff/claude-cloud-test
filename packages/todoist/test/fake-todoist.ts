@@ -126,6 +126,10 @@ export class FakeTodoist {
       return { status: 200, data: t };
     }
     const t = this.tasks.get(id!);
+    if (!t && !action && m === "GET") {
+      const done = this.completed.find((c) => c.id === id);
+      return done ? { status: 200, data: done } : { status: 404, data: "Task not found" };
+    }
     if (!t) return { status: 404, data: "Task not found" };
     if (!action && m === "GET") return { status: 200, data: t };
     if (!action && m === "DELETE") {

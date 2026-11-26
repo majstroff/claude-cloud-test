@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { TodoistClient } from "./client.ts";
-import { TodoistError, toTodoistError } from "./errors.ts";
+import { TodoistError, USER_MESSAGES, toTodoistError } from "./errors.ts";
 import { type FrameTask, fromTodoist, projectFromTodoist } from "./model.ts";
 import type { OutboxEntry, OutboxOp, SyncSnapshot, SyncStore } from "./store.ts";
-import type { CreateTaskInput, DueInput, MoveTaskInput, UpdateTaskInput } from "./types.ts";
+import type { CreateTaskInput, DueInput, MoveTaskInput, TodoistTask, UpdateTaskInput } from "./types.ts";
 
 export type TaskView = "today" | "overdue" | "upcoming" | "backlog" | "completed" | "all";
 
@@ -455,19 +455,32 @@ export class TodoistSyncService {
           (s.lastSyncAt ? Date.parse(s.lastSyncAt) : now.getTime() - 30 * DAY) - DAY,
         ),
       );
-      const done = await client.listCompletedTasks(since.toISOString(), until.toISOString());
+      // История выполненных на бесплатном тарифе ограничена неделей, а сам запрос может быть
+      // недоступен; поэтому всё, чего нет в истории, проверяем по одной задаче.
+      const done = await client.listCompletedTasks(since.toISOString(), until.toISOString()).catch(() => []);
       const doneById = new Map(done.map((d) => [d.id, d]));
+      let checks = 0;
       for (const t of missing) {
-        const d = doneById.get(t.todoistId!);
-        if (d) {
+        let d: TodoistTask | null | undefined = doneById.get(t.todoistId!);
+        if (!d) {
+          if (checks++ >= MAX_SINGLE_CHECKS) continue; // остальные проверим при следующей синхронизации
+          try {
+            d = await client.getTask(t.todoistId!);
+          } catch (err) {
+            if (toTodoistError(err).code !== "not_found") throw err;
+            d = null;
+          }
+        }
+        if (d && (d.checked || d.completed_at)) {
           t.completed = true;
           t.completedAt = d.completed_at ?? now.toISOString();
           t.syncState = "synced";
           result.pulled++;
-        } else {
+        } else if (d === null || (d && d.is_deleted)) {
           t.syncState = "remote_deleted";
           result.remoteDeleted++;
         }
+        // Задача активна, но не пришла в списке (например, гонка с правкой): оставляем как есть.
       }
     }
     s.lastSyncAt = this.#now().toISOString();
@@ -514,7 +527,7 @@ export class TodoistSyncService {
           continue;
         }
         t.syncState = "error";
-        t.syncError = { code: e.code, message: e.message };
+        t.syncError = { code: e.code, message: e.code === "plan_limit" ? USER_MESSAGES.plan_limit : e.message };
         s.outbox = s.outbox.filter((x) => x.opId !== entry.opId);
         blocked.add(t.id);
       }
@@ -607,6 +620,8 @@ export class TodoistSyncService {
 }
 
 const DAY = 86_400_000;
+/** Сколько пропавших задач проверять по одной за синхронизацию (бережём лимит запросов). */
+const MAX_SINGLE_CHECKS = 30;
 
 function mustGet(s: SyncSnapshot, id: string): FrameTask {
   const t = s.tasks[id];

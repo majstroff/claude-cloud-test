@@ -257,6 +257,10 @@ export class TodoistClient {
 
 function httpError(status: number, method: string, path: string, detail: string, retryAfter?: number) {
   const where = `Todoist ответил ${status} на ${method} ${path}${detail ? `: ${detail}` : ""}`;
+  // Ограничения тарифа Todoist приходят как 403 (иногда 400) с текстом про лимит или Pro.
+  if ((status === 403 || status === 400 || status === 422) && PLAN_LIMIT_RE.test(detail)) {
+    return new TodoistError("plan_limit", where, { status });
+  }
   if (status === 401 || status === 403) return new TodoistError("unauthorized", where, { status });
   if (status === 404) return new TodoistError("not_found", where, { status });
   if (status === 429) return new TodoistError("rate_limited", where, { status, retryAfter });
@@ -264,6 +268,8 @@ function httpError(status: number, method: string, path: string, detail: string,
   if (status === 400 || status === 422) return new TodoistError("validation", where, { status });
   return new TodoistError("unexpected", where, { status });
 }
+
+const PLAN_LIMIT_RE = /limit|premium|upgrade|pro plan|maximum|max_|read[-_ ]?only|view[-_ ]?only/i;
 
 function parseRetryAfter(v: string | null): number | undefined {
   if (!v) return undefined;

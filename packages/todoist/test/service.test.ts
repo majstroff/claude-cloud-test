@@ -87,6 +87,33 @@ describe("pull from Todoist", () => {
   });
 });
 
+describe("бесплатный тариф Todoist", () => {
+  it("без истории выполненных проверяет пропавшие задачи по одной", async () => {
+    const a = api.addTask({ content: "Сделано в Todoist" });
+    const b = api.addTask({ content: "Удалено в Todoist" });
+    const svc = service();
+    await svc.sync();
+    api.completeRemote(a.id);
+    api.tasks.delete(b.id);
+    // На бесплатном тарифе история ограничена неделей; имитируем отказ запроса истории.
+    api.failNext((r) => r.path.startsWith("/tasks/completed"), { status: 403, body: "Premium only" });
+    const r = await svc.sync();
+    const all = await svc.listTasks();
+    expect(all.find((t) => t.todoistId === a.id)).toMatchObject({ completed: true, syncState: "synced" });
+    expect(all.find((t) => t.todoistId === b.id)).toMatchObject({ syncState: "remote_deleted" });
+    expect(r.remoteDeleted).toBe(1);
+  });
+
+  it("лимит тарифа показывает понятную причину у задачи", async () => {
+    const svc = service();
+    api.failNext((r) => r.method === "POST" && r.path === "/tasks", { status: 403, body: "Max 300 active tasks per project limit reached" });
+    const t = await svc.createTask({ content: "301-я задача", project_id: "p_work" });
+    expect(t.syncState).toBe("error");
+    expect(t.syncError).toMatchObject({ code: "plan_limit", message: expect.stringContaining("бесплатного тарифа") });
+    expect((await svc.status()).pending).toBe(0);
+  });
+});
+
 describe("push to Todoist", () => {
   it("creates, edits, completes and reopens", async () => {
     const svc = service();

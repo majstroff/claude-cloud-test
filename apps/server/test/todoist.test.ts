@@ -127,6 +127,15 @@ describe('Todoist в сервере', () => {
     expect(await fs.readFile(path.join(vaultDir, LINE.path), 'utf8')).not.toContain('[todoist::');
   });
 
+  it('лимит бесплатного тарифа возвращает понятное сообщение и не помечает строку', async () => {
+    await start(makeService());
+    api.failNext((r) => r.method === 'POST' && r.path === '/tasks', { status: 403, body: 'Maximum number of active tasks in project reached' });
+    const r = await send('POST', '/api/todoist/backlog/send-vault-task', { ...LINE, projectId: 'p_work' });
+    expect(r.status).toBe(402);
+    expect(r.body).toMatchObject({ code: 'plan_limit', error: expect.stringContaining('бесплатного тарифа Todoist') });
+    expect(await fs.readFile(path.join(vaultDir, LINE.path), 'utf8')).not.toContain('[todoist::');
+  });
+
   it('завершение в Todoist отмечает строку в Obsidian, и наоборот', async () => {
     await start(makeService());
     const sent = await send('POST', '/api/todoist/backlog/send-vault-task', LINE);

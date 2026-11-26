@@ -116,6 +116,7 @@ export function errorResponse(err: unknown): ApiResponse {
     network: 503,
     conflict: 409,
     confirmation_required: 428,
+    plan_limit: 402,
     unexpected: 500,
   };
   return {

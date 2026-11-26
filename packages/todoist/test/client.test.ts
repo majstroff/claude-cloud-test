@@ -110,6 +110,13 @@ describe("TodoistClient", () => {
     expect(sleeps).toEqual([]);
   });
 
+  it("recognises free-plan limits instead of blaming the token", async () => {
+    api.failNext(() => true, { status: 403, body: '{"error":"Maximum number of projects reached","error_tag":"MAX_PROJECTS_LIMIT_REACHED"}' });
+    await expect(make().createProject({ name: "Шестой" })).rejects.toMatchObject({ code: "plan_limit", retryable: false });
+    api.failNext(() => true, { status: 403, body: "Forbidden" });
+    await expect(make().listProjects()).rejects.toMatchObject({ code: "unauthorized" });
+  });
+
   it("never leaks the token in errors, JSON or inspect output", async () => {
     const secret = "good-token";
     api.failNext(() => true, { status: 400, body: `invalid token ${secret}` });

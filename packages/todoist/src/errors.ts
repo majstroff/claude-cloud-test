@@ -13,6 +13,7 @@ export type TodoistErrorCode =
   | "network" // DNS, offline, timeout
   | "conflict" // local and remote changed the same task
   | "confirmation_required" // destructive action without explicit confirmation
+  | "plan_limit" // limit of the Todoist plan (e.g. 5 projects or 300 tasks per project on the free plan)
   | "unexpected";
 
 export class TodoistError extends Error {
@@ -60,6 +61,8 @@ export const USER_MESSAGES: Record<TodoistErrorCode, string> = {
   network: "Нет связи с Todoist. Изменения сохранены локально и будут отправлены позже.",
   conflict: "Задача изменилась и в Frame OS, и в Todoist. Выберите, какую версию оставить.",
   confirmation_required: "Это действие нужно подтвердить.",
+  plan_limit:
+    "Упёрлись в ограничение бесплатного тарифа Todoist: не больше 5 личных проектов и 300 активных задач в проекте. Выберите другой проект или Входящие либо завершите часть задач.",
   unexpected: "Неожиданная ошибка Todoist.",
 };
 
