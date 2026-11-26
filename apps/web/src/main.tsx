@@ -13,6 +13,9 @@ import { IdeasPage } from './pages/Ideas.tsx';
 import { BacklogPage } from './pages/Backlog.tsx';
 import { NotePage } from './pages/Note.tsx';
 import { FavoritesPage, SettingsPage } from './pages/Settings.tsx';
+import { VacancyPage, WorkPage } from './pages/Work.tsx';
+import { CompanyPage, ContactPage, ContactsPage } from './pages/Contacts.tsx';
+import { DocumentPage, DocumentsPage } from './pages/Documents.tsx';
 import './styles.css';
 
 const queryClient = new QueryClient({
@@ -39,6 +42,13 @@ createRoot(document.getElementById('root')!).render(
               <Route path="projects/view" element={<ProjectPage />} />
               <Route path="backlog" element={<BacklogPage />} />
               <Route path="ideas" element={<IdeasPage />} />
+              <Route path="work" element={<WorkPage />} />
+              <Route path="work/view" element={<VacancyPage />} />
+              <Route path="contacts" element={<ContactsPage />} />
+              <Route path="contacts/view" element={<ContactPage />} />
+              <Route path="contacts/company" element={<CompanyPage />} />
+              <Route path="documents" element={<DocumentsPage />} />
+              <Route path="documents/view" element={<DocumentPage />} />
               <Route path="note" element={<NotePage />} />
               <Route path="favorites" element={<FavoritesPage />} />
               <Route path="settings" element={<SettingsPage />} />

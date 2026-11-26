@@ -197,6 +197,87 @@ try {
     await shot('backlog');
   });
 
+  await step('Работа: вакансия проходит по воронке, собеседование попадает в файл и календарь', async () => {
+    await page.goto(`${base}/work`);
+    await expectText('Product Manager — Acme');
+    await page.getByRole('button', { name: 'Вакансия', exact: true }).click();
+    const dlg = page.getByRole('dialog', { name: 'Новая вакансия' });
+    await dlg.getByLabel('Название (например, «PM — Acme»)').fill('E2E PM — Зета');
+    await dlg.getByLabel('Компания', { exact: true }).fill('Зета');
+    await dlg.getByLabel('Ссылка на вакансию').fill('https://zeta.example.com/pm');
+    await dlg.getByLabel('Рекрутер').fill('Анна Смирнова');
+    await dlg.getByRole('button', { name: 'Создать' }).click();
+    await page.waitForURL(/work\/view/);
+    await page.getByRole('button', { name: 'Отклик', exact: true }).click();
+    await expectText('Интересно → Отклик');
+    await page.getByLabel('Дата собеседования').fill('2026-12-10');
+    await page.getByLabel('Время').fill('14:30');
+    await page.getByRole('button', { name: 'Назначить' }).click();
+    await expectText('Отклик → Собеседование');
+    const raw = await fs.readFile(path.join(vault, 'Areas/Работа/Вакансии/E2E PM — Зета.md'), 'utf8');
+    for (const part of ['status: interview', 'interview: 2026-12-10', 'recruiter: "[[Анна Смирнова]]"', 'company: "[[Зета]]"', '- 2026-12-10 14:30']) {
+      if (!raw.includes(part)) throw new Error(`Нет «${part}» в файле:\n${raw}`);
+    }
+    await fs.access(path.join(vault, 'Resources/Компании/Зета.md'));
+    const cal = await (await fetch(`${base}/api/calendar?from=2026-12-10&to=2026-12-10`)).json();
+    if (!cal.days[0].items.some((i) => i.title === 'Собеседование: E2E PM — Зета')) throw new Error('Нет в календаре');
+    await shot('vacancy');
+  });
+
+  await step('Контакты: запись общения с договорённостью и следующим контактом', async () => {
+    await page.goto(`${base}/contacts`);
+    await expectText('Игорь Петров');
+    await page.locator('.contact-card', { hasText: 'Игорь Петров' }).click();
+    await page.waitForURL(/contacts\/view/);
+    await page.getByLabel('Что обсудили').fill('E2E: обсудили второй этап');
+    await page.getByLabel('Договорённость').fill('E2E: отправить смету');
+    await page.getByRole('button', { name: 'Записать' }).click();
+    await expectText('Записано в историю общения');
+    await expectText('E2E: отправить смету');
+    const raw = await fs.readFile(path.join(vault, 'Resources/Контакты/Игорь Петров.md'), 'utf8');
+    if (!/- \d{4}-\d{2}-\d{2} · звонок: E2E: обсудили второй этап/.test(raw) || !raw.includes('- [ ] E2E: отправить смету')) throw new Error(raw);
+    if (raw.includes('next_contact: 2026-11-20')) throw new Error('Прошедший следующий контакт не снят');
+    await shot('contact');
+    await page.goto(`${base}/contacts?tab=companies`);
+    await expectText('Студия Север');
+  });
+
+  await step('Документы: полный номер не принимается, создаётся конфиденциальная заметка и задача на продление', async () => {
+    await page.goto(`${base}/documents`);
+    await page.locator('.li-title', { hasText: 'РВП' }).first().waitFor();
+    await page.getByRole('button', { name: 'Документ', exact: true }).click();
+    const dlg = page.getByRole('dialog', { name: 'Новый документ' });
+    await dlg.getByLabel('Название').fill('E2E Загранпаспорт');
+    await dlg.getByLabel('Последние 4 символа номера').fill('123456789');
+    await dlg.getByLabel('Действует до').fill('2027-02-01');
+    const errorsBefore = consoleErrors.length;
+    await dlg.getByRole('button', { name: 'Создать' }).click();
+    await dlg.getByText('полный номер в хранилище не записывается').waitFor();
+    // Ответ 400 здесь ожидаем — это проверка поля, браузер пишет его в консоль.
+    consoleErrors.splice(errorsBefore).filter((e) => !/status of 400/.test(e)).forEach((e) => consoleErrors.push(e));
+    await dlg.getByLabel('Последние 4 символа номера').fill('6789');
+    await dlg.getByRole('button', { name: 'Создать' }).click();
+    await page.waitForURL(/documents\/view/);
+    await page.getByRole('button', { name: 'Создать задачу на продление' }).click();
+    await expectText('Задача на продление создана');
+    const raw = await fs.readFile(path.join(vault, 'Areas/Документы/E2E Загранпаспорт.md'), 'utf8');
+    if (!raw.includes('sensitive: true') || !raw.includes('number_last4: "6789"') || !raw.includes('- [ ] Продлить: E2E Загранпаспорт (до 2027-02-01)')) throw new Error(raw);
+    if (raw.includes('123456789')) throw new Error('Полный номер записан');
+    const s = await (await fetch(`${base}/api/search?q=${encodeURIComponent('Загранпаспорт')}`)).json();
+    if (s.results.some((r) => r.snippet)) throw new Error('Сниппет конфиденциального документа в поиске');
+    await shot('document');
+  });
+
+  await step('Главная показывает напоминания: контакты, документы, собеседования', async () => {
+    await page.goto(base);
+    const card = page.locator('section', { hasText: 'Напоминания' });
+    await card.getByText('Продлить: РВП').waitFor();
+    await card.getByText('Собеседование: Product Manager — Acme').waitFor();
+    for (const name of ['Работа', 'Контакты', 'Документы']) {
+      await page.getByRole('link', { name, exact: true }).first().waitFor({ state: 'attached' });
+    }
+  });
+
   await step('Изменение файла в Obsidian появляется без перезагрузки', async () => {
     await page.goto(`${base}/backlog`);
     await page.locator('li.task').first().waitFor();

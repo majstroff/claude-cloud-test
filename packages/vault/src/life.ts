@@ -29,8 +29,17 @@ export interface TaskDTO extends VaultTask {
   project: { path: string; title: string } | null;
 }
 
+export type CalendarSource = (from: string, to: string) => Array<{ date: string; item: CalendarItem }>;
+
 export class Life {
+  private calendarSources: CalendarSource[] = [];
+
   constructor(readonly vault: Vault) {}
+
+  /** Модули (работа, контакты, документы…) добавляют свои даты в общий календарь. */
+  addCalendarSource(fn: CalendarSource): void {
+    this.calendarSources.push(fn);
+  }
 
   get today(): string {
     return this.vault.today();
@@ -496,6 +505,9 @@ export class Life {
           amount: num(fm.amount),
         });
       }
+    }
+    for (const source of this.calendarSources) {
+      for (const { date, item } of source(from, to)) push(date, item);
     }
     const days: CalendarDay[] = [];
     for (let d = from; d <= to; d = addDays(d, 1)) {

@@ -69,6 +69,11 @@ export interface FolderConfig {
   inbox: string;
   daily: string;
   events: string;
+  /** Работа и поиск работы: вакансии и материалы для откликов. */
+  work: string;
+  contacts: string;
+  companies: string;
+  documents: string;
   /** Формат имени файла ежедневной заметки (поддерживаются YYYY, MM, DD). */
   dailyFormat: string;
   dailyTemplate: string | null;
@@ -232,6 +237,10 @@ export class Vault {
     if (inDir(f.goals)) return 'goal';
     if (inDir(f.cycles)) return 'cycle';
     if (inDir(f.ideas)) return 'idea';
+    if (inDir(`${f.work}/Вакансии`)) return 'vacancy';
+    if (inDir(f.contacts)) return 'contact';
+    if (inDir(f.companies)) return 'company';
+    if (inDir(f.documents)) return 'document';
     if (para === 'projects') {
       const base = path.posix.basename(rel, '.md');
       if (dir === f.projects) return 'project';
@@ -300,6 +309,10 @@ export class Vault {
       cycles: byBase(/^(cycles?|циклы|12[\s-]?week.*|12[\s-]?недель.*)$/i, `${areas}/Cycles`),
       ideas: byBase(/^(ideas?|идеи)$/i, `${inbox}/Ideas`),
       events: byBase(/^(calendar|events?|календарь|события)$/i, 'Calendar'),
+      work: byBase(/^(work|career|работа|карьера)$/i, `${areas}/Работа`),
+      contacts: byBase(/^(contacts|people|контакты|люди)$/i, `${resources}/Контакты`),
+      companies: byBase(/^(companies|organizations|компании|организации)$/i, `${resources}/Компании`),
+      documents: byBase(/^(documents|docs|документы)$/i, `${areas}/Документы`),
       daily,
       dailyFormat,
       dailyTemplate,

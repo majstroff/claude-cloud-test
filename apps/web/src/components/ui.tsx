@@ -165,6 +165,10 @@ export const TYPE_LABEL: Record<string, string> = {
   contact: 'Контакт',
   document: 'Документ',
   area: 'Сфера',
+  vacancy: 'Вакансия',
+  company: 'Компания',
+  resume: 'Резюме',
+  portfolio: 'Портфолио',
 };
 
 export const STATUS_LABEL: Record<string, string> = {
