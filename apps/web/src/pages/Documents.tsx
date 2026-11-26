@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowLeft, CalendarPlus, FileLock2, FileText, Plus, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CalendarPlus, Eye, EyeOff, FileLock2, FileText, Plus, ShieldCheck } from 'lucide-react';
 import { api, type DocumentDTO, type DocumentDetail, type Health } from '../api.ts';
 import { AddTaskInline, TaskList } from '../components/TaskList.tsx';
 import { CreateEntityModal, EditEntityCard, RefLink, RelatedCard, SectionEditor } from '../components/Entities.tsx';
@@ -61,7 +61,7 @@ export function DocumentsPage() {
       <div className="notice">
         <ShieldCheck size={18} style={{ flex: '0 0 auto' }} />
         <div className="small">
-          Frame OS хранит о документе только сведения: где лежит оригинал, сроки, последние 4 символа номера. Сканы держите в зашифрованном месте и указывайте его в поле «Где хранится».
+          Сведения о документе, включая номер, хранятся в заметке Obsidian открытым текстом. В интерфейсе номер скрыт, пока вы не нажмёте «Показать». Сканы держите в зашифрованном месте и указывайте его в поле «Где хранится».
           Конфиденциальные документы не показываются в поиске и не передаются ИИ-помощнику без явного разрешения (<code>ai: true</code> в заметке).
         </div>
       </div>
@@ -164,6 +164,7 @@ export function DocumentPage() {
   const q = useQuery({ queryKey: ['document', path], queryFn: () => api.get<DocumentDetail>(`/api/document?path=${encodeURIComponent(path)}`), enabled: !!path });
   const health = useQuery({ queryKey: ['health'], queryFn: () => api.get<Health>('/api/health') });
   const renewal = useRenewal();
+  const [showNumber, setShowNumber] = useState(false);
   if (!path) return <Empty title="Документ не выбран" action={<Link to="/documents" className="btn small">К документам</Link>} />;
   if (q.isPending) return <div className="card"><Loading rows={6} /></div>;
   if (q.isError) return <ErrorBox error={q.error} onRetry={() => q.refetch()} />;
@@ -185,7 +186,19 @@ export function DocumentPage() {
                 <div className="small muted">
                   {DOC_TYPE_LABEL[d.docType]}
                   {d.owner ? ` · ${d.owner}` : ''}
-                  {d.numberLast4 ? ` · №…${d.numberLast4}` : ''}
+                  {d.number ? (
+                    <>
+                      {' · № '}
+                      <span className="mono">{showNumber ? d.number : `••••${d.numberLast4 ?? ''}`}</span>{' '}
+                      <button className="btn small icon ghost" onClick={() => setShowNumber(!showNumber)} aria-label={showNumber ? 'Скрыть номер' : 'Показать номер'}>
+                        {showNumber ? <EyeOff size={13} /> : <Eye size={13} />}
+                      </button>
+                    </>
+                  ) : d.numberLast4 ? (
+                    ` · №…${d.numberLast4}`
+                  ) : (
+                    ''
+                  )}
                 </div>
               </div>
               {d.sensitive ? <span className="chip dark"><FileLock2 size={12} /> Конфиденциально</span> : <span className="chip">Открытый</span>}

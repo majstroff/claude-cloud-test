@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Save } from 'lucide-react';
+import { Eye, EyeOff, Save } from 'lucide-react';
 import { api, type NoteData, type NoteSummary } from '../api.ts';
 import { entityHref, type FieldDef } from '../entities.ts';
 import { Modal } from './Layout.tsx';
@@ -63,6 +63,8 @@ export function EntityFields({ defs, values, onChange, idPrefix }: { defs: Field
               ))}
             </select>
           );
+        } else if (d.kind === 'secret') {
+          input = <SecretInput id={id} value={String(v ?? '')} onChange={(x) => set(d.key, x)} placeholder={d.placeholder} />;
         } else if (d.kind === 'list') {
           input = <textarea id={id} className="textarea" rows={2} value={String(v ?? '')} onChange={(e) => set(d.key, e.target.value)} placeholder={d.placeholder} />;
         } else {
@@ -97,6 +99,29 @@ export function EntityFields({ defs, values, onChange, idPrefix }: { defs: Field
           </label>
         );
       })}
+    </div>
+  );
+}
+
+/** Поле с чувствительным значением: скрыто, пока не нажать «Показать». */
+function SecretInput({ id, value, onChange, placeholder }: { id: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+      <input
+        id={id}
+        className="input"
+        style={{ flex: 1, minWidth: 0 }}
+        type={shown ? 'text' : 'password'}
+        autoComplete="off"
+        spellCheck={false}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
+      <button type="button" className="btn small icon" onClick={() => setShown(!shown)} aria-label={shown ? 'Скрыть номер' : 'Показать номер'} title={shown ? 'Скрыть' : 'Показать'}>
+        {shown ? <EyeOff size={14} /> : <Eye size={14} />}
+      </button>
     </div>
   );
 }

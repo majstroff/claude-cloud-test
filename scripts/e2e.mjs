@@ -242,27 +242,26 @@ try {
     await expectText('Студия Север');
   });
 
-  await step('Документы: полный номер не принимается, создаётся конфиденциальная заметка и задача на продление', async () => {
+  await step('Документы: номер скрыт в интерфейсе, создаётся конфиденциальная заметка и задача на продление', async () => {
     await page.goto(`${base}/documents`);
     await page.locator('.li-title', { hasText: 'РВП' }).first().waitFor();
     await page.getByRole('button', { name: 'Документ', exact: true }).click();
     const dlg = page.getByRole('dialog', { name: 'Новый документ' });
     await dlg.getByLabel('Название').fill('E2E Загранпаспорт');
-    await dlg.getByLabel('Последние 4 символа номера').fill('123456789');
+    const numberInput = dlg.getByLabel('Номер документа');
+    if ((await numberInput.getAttribute('type')) !== 'password') throw new Error('Номер не скрыт при вводе');
+    await numberInput.fill('75 1236789');
     await dlg.getByLabel('Действует до').fill('2027-02-01');
-    const errorsBefore = consoleErrors.length;
-    await dlg.getByRole('button', { name: 'Создать' }).click();
-    await dlg.getByText('полный номер в хранилище не записывается').waitFor();
-    // Ответ 400 здесь ожидаем — это проверка поля, браузер пишет его в консоль.
-    consoleErrors.splice(errorsBefore).filter((e) => !/status of 400/.test(e)).forEach((e) => consoleErrors.push(e));
-    await dlg.getByLabel('Последние 4 символа номера').fill('6789');
     await dlg.getByRole('button', { name: 'Создать' }).click();
     await page.waitForURL(/documents\/view/);
+    await expectText('••••6789');
+    if (await page.getByText('75 1236789').count()) throw new Error('Номер виден без нажатия «Показать»');
+    await page.getByRole('button', { name: 'Показать номер' }).first().click();
+    await expectText('75 1236789');
     await page.getByRole('button', { name: 'Создать задачу на продление' }).click();
     await expectText('Задача на продление создана');
     const raw = await fs.readFile(path.join(vault, 'Areas/Документы/E2E Загранпаспорт.md'), 'utf8');
-    if (!raw.includes('sensitive: true') || !raw.includes('number_last4: "6789"') || !raw.includes('- [ ] Продлить: E2E Загранпаспорт (до 2027-02-01)')) throw new Error(raw);
-    if (raw.includes('123456789')) throw new Error('Полный номер записан');
+    if (!raw.includes('sensitive: true') || !raw.includes('number: 75 1236789') || !raw.includes('- [ ] Продлить: E2E Загранпаспорт (до 2027-02-01)')) throw new Error(raw);
     const s = await (await fetch(`${base}/api/search?q=${encodeURIComponent('Загранпаспорт')}`)).json();
     if (s.results.some((r) => r.snippet)) throw new Error('Сниппет конфиденциального документа в поиске');
     await shot('document');

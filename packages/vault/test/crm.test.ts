@@ -181,15 +181,21 @@ describe('Документы', () => {
     ]);
   });
 
-  it('создаёт документ конфиденциальным и не принимает полный номер', async () => {
+  it('создаёт документ конфиденциальным и хранит полный номер в свойствах', async () => {
     const { crm, vault } = await setup();
     await expect(
-      crm.createEntity({ type: 'document', title: 'Загранпаспорт', fields: { doc_type: 'passport', number_last4: '123456789' } }),
-    ).rejects.toThrow(/4 последних/);
-    const n = await crm.createEntity({ type: 'document', title: 'Загранпаспорт', fields: { doc_type: 'passport', number_last4: '6789', expires: '2027-01-10' } });
+      crm.createEntity({ type: 'document', title: 'Загранпаспорт', fields: { doc_type: 'passport', number: '<script>' } }),
+    ).rejects.toThrow(/Номер/);
+    const n = await crm.createEntity({ type: 'document', title: 'Загранпаспорт', fields: { doc_type: 'passport', number: '75  1234567', expires: '2027-01-10' } });
     expect(n.path).toBe('Areas/Документы/Загранпаспорт.md');
     const note = vault.require(n.path);
     expect(note.sensitive).toBe(true);
+    expect(note.frontmatter.number).toBe('75 1234567');
+    const doc = crm.document(note);
+    expect(doc).toMatchObject({ number: '75 1234567', numberLast4: '4567', warnings: [] });
+    // Номер не попадает ни в поисковый индекс, ни в общий список заметок, ни к ИИ.
+    expect(vault.searchNotes('1234567')).toEqual([]);
+    expect(aiAccess(note).allowed).toBe(false);
     // Конфиденциальная заметка не показывает текст в поиске.
     expect(vault.searchNotes('Загранпаспорт')[0]?.snippet).toBe('');
     const task = await crm.createRenewalTask(n.path);
@@ -199,7 +205,7 @@ describe('Документы', () => {
     expect(crm.document(vault.require(n.path)).renewalTask?.id).toBe(task.id);
   });
 
-  it('предупреждает о скане в хранилище и полном номере', () => {
+  it('предупреждает о скане в хранилище и номере в тексте заметки', () => {
     const w = documentWarnings({ body: 'Скан: ![[passport.jpg]]\nНомер 45 12 345678', frontmatter: {}, sensitive: true }, 'passport');
     expect(w).toHaveLength(2);
     expect(documentWarnings({ body: 'Выдан 2020-01-01', frontmatter: { issued: '2020-01-01' }, sensitive: true }, 'passport')).toEqual([]);

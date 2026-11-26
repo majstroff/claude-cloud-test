@@ -67,7 +67,7 @@ const SENSITIVE_DOC_TYPES: DocType[] = ['passport', 'residence', 'visa', 'contra
 export type EntityType = 'vacancy' | 'company' | 'contact' | 'document' | 'resume' | 'portfolio';
 export const ENTITY_TYPES: EntityType[] = ['vacancy', 'company', 'contact', 'document', 'resume', 'portfolio'];
 
-type FieldKind = 'text' | 'date' | 'time' | 'url' | 'email' | 'phone' | 'number' | 'link' | 'list' | 'boolean' | 'last4' | { enum: readonly string[] };
+type FieldKind = 'text' | 'date' | 'time' | 'url' | 'email' | 'phone' | 'number' | 'link' | 'list' | 'boolean' | 'last4' | 'docnumber' | { enum: readonly string[] };
 
 /** Какие свойства можно задавать через интерфейс и как их проверять. */
 export const ENTITY_FIELDS: Record<EntityType, Record<string, FieldKind>> = {
@@ -114,6 +114,7 @@ export const ENTITY_FIELDS: Record<EntityType, Record<string, FieldKind>> = {
     doc_type: { enum: DOC_TYPES },
     owner: 'text',
     storage: 'text',
+    number: 'docnumber',
     number_last4: 'last4',
     issued: 'date',
     expires: 'date',
@@ -133,7 +134,7 @@ const FIELD_LABEL: Record<string, string> = {
   result: 'Результат', project: 'Проект', kind: 'Вид', website: 'Сайт', industry: 'Отрасль', city: 'Город', role: 'Должность',
   client_status: 'Статус клиента', phone: 'Телефон', email: 'Email', links: 'Ссылки', last_contact: 'Последняя связь',
   next_contact: 'Следующий контакт', doc_type: 'Тип документа', owner: 'Владелец', storage: 'Где хранится',
-  number_last4: 'Последние символы номера', issued: 'Дата выдачи', expires: 'Действует до', remind_days: 'Напомнить за, дней',
+  number: 'Номер', number_last4: 'Последние символы номера', issued: 'Дата выдачи', expires: 'Действует до', remind_days: 'Напомнить за, дней',
   organization: 'Организация', sensitive: 'Конфиденциально', version: 'Версия', updated: 'Обновлено',
 };
 
@@ -214,6 +215,8 @@ export interface DocumentDTO {
   docType: DocType;
   owner: string | null;
   storage: string | null;
+  /** Полный номер (если записан). В интерфейсе показывается только по кнопке. */
+  number: string | null;
   numberLast4: string | null;
   issued: string | null;
   expires: string | null;
@@ -353,11 +356,13 @@ export class Crm {
         if (!/^\+?[\d\s()\-]{5,20}$/.test(s)) throw new VaultError(`Поле «${label}»: неверный номер телефона`, 'invalid');
         return s;
       case 'last4':
-        // Полный номер документа не храним в открытом Markdown — только последние символы.
-        if (!/^[0-9A-Za-zА-Яа-я]{1,4}$/.test(s)) {
-          throw new VaultError('Укажите не больше 4 последних символов номера: полный номер в хранилище не записывается', 'invalid');
-        }
+        if (!/^[0-9A-Za-zА-Яа-я]{1,4}$/.test(s)) throw new VaultError('Поле «Последние символы номера»: не больше 4 букв или цифр', 'invalid');
         return s;
+      case 'docnumber':
+        if (!/^[0-9A-Za-zА-Яа-яЁё№\s\-/.]{1,40}$/.test(s)) {
+          throw new VaultError('Поле «Номер»: только буквы, цифры, пробелы, дефис, точка, «/» и «№», до 40 символов', 'invalid');
+        }
+        return s.replace(/\s+/g, ' ');
       case 'link':
         return this.linkOrText(s);
       default:
@@ -762,7 +767,8 @@ export class Crm {
       docType,
       owner: str(fm.owner),
       storage: str(fm.storage),
-      numberLast4: str(fm.number_last4),
+      number: str(fm.number),
+      numberLast4: str(fm.number) ? str(fm.number)!.replace(/[^0-9A-Za-zА-Яа-яЁё]/g, '').slice(-4) : str(fm.number_last4),
       issued: date(fm.issued),
       expires,
       remindDays,
@@ -881,13 +887,9 @@ export function documentWarnings(n: Pick<Note, 'body' | 'frontmatter' | 'sensiti
   if (ATTACHMENT_RE.test(n.body)) {
     out.push('В заметке есть ссылка на скан или фото внутри хранилища: файл лежит без шифрования. Перенесите его в зашифрованное место и укажите его в поле «Где хранится».');
   }
-  const scrub = (s: string) => s.replace(/\d{4}-\d{2}-\d{2}/g, ' ');
-  const fmText = Object.entries(n.frontmatter)
-    .filter(([k]) => !['number_last4', 'remind_days'].includes(k))
-    .map(([, v]) => (typeof v === 'string' || typeof v === 'number' ? String(v) : ''))
-    .join(' ');
-  if (/\d[\d \-]{5,}\d/.test(scrub(n.body) + ' ' + scrub(fmText))) {
-    out.push('Похоже, в заметке записан полный номер документа. Оставьте только последние 4 символа в поле «Последние символы номера».');
+  // Номер в поле «Номер» скрыт в интерфейсе; в тексте заметки он виден всегда.
+  if (/\d[\d \-]{5,}\d/.test(n.body.replace(/\d{4}-\d{2}-\d{2}/g, ' '))) {
+    out.push('Похоже, номер документа записан в тексте заметки. Перенесите его в поле «Номер»: там он скрыт в интерфейсе, пока вы не нажмёте «Показать».');
   }
   if (!n.sensitive && SENSITIVE_DOC_TYPES.includes(docType)) {
     out.push('Документ не помечен как конфиденциальный: включите «Конфиденциально», чтобы он не попадал в поиск и к ИИ.');

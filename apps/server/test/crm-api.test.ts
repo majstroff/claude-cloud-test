@@ -89,10 +89,13 @@ describe('API: контакты и документы', () => {
     const docs = await get('/api/documents');
     expect(docs.body.documents[0]).toMatchObject({ title: 'РВП', state: 'expiring' });
     const rel = 'Areas/Документы/Полис ОСАГО.md';
-    expect((await send('PUT', '/api/entity', { path: rel, set: { sensitive: true, number_last4: '4521' } })).status).toBe(200);
-    expect((await send('PUT', '/api/entity', { path: rel, set: { number_last4: 'AB 1234567' } })).status).toBe(400);
+    expect((await send('PUT', '/api/entity', { path: rel, set: { sensitive: true, number: 'ХХХ 0123454521' } })).status).toBe(200);
+    expect((await send('PUT', '/api/entity', { path: rel, set: { number: 'x'.repeat(41) } })).status).toBe(400);
     const d = await get(`/api/document?path=${encodeURIComponent(rel)}`);
-    expect(d.body).toMatchObject({ sensitive: true, numberLast4: '4521', warnings: [] });
+    expect(d.body).toMatchObject({ sensitive: true, number: 'ХХХ 0123454521', numberLast4: '4521', warnings: [] });
+    // В общем списке заметок свойства конфиденциального документа скрыты.
+    const notes = await get('/api/notes?type=document');
+    expect(JSON.stringify(notes.body)).not.toContain('0123454521');
 
     const task = await send('POST', '/api/documents/renewal-task', { path: 'Areas/Документы/РВП.md' });
     expect(task.body.task.due).toBe('2026-11-24');

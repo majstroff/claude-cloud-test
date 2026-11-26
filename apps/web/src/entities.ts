@@ -63,7 +63,7 @@ export const DOC_STATE_LABEL: Record<string, string> = {
 export type FieldDef = {
   key: string;
   label: string;
-  kind: 'text' | 'date' | 'time' | 'url' | 'email' | 'tel' | 'number' | 'link' | 'list' | 'boolean' | 'select';
+  kind: 'text' | 'date' | 'time' | 'url' | 'email' | 'tel' | 'number' | 'link' | 'list' | 'boolean' | 'select' | 'secret';
   options?: Record<string, string>;
   /** Для ссылок: подсказки из заметок этих типов. */
   linkTypes?: string[];
@@ -115,10 +115,10 @@ export const DOCUMENT_FIELDS: FieldDef[] = [
   { key: 'owner', label: 'Владелец', kind: 'text', placeholder: 'Я, супруга, ребёнок…' },
   { key: 'storage', label: 'Где хранится оригинал / скан', kind: 'text', wide: true, placeholder: 'Сейф дома; скан — в зашифрованном архиве' },
   {
-    key: 'number_last4',
-    label: 'Последние 4 символа номера',
-    kind: 'text',
-    hint: 'Полный номер не записывается в хранилище',
+    key: 'number',
+    label: 'Номер документа',
+    kind: 'secret',
+    hint: 'Хранится в заметке открытым текстом, в интерфейсе скрыт',
   },
   { key: 'issued', label: 'Дата выдачи', kind: 'date' },
   { key: 'expires', label: 'Действует до', kind: 'date' },

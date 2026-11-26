@@ -415,3 +415,4 @@ label.field { display: grid; gap: 6px; font-size: 12px; color: var(--text-2); }
 @media (max-width: 640px) {
   .timeline li { grid-template-columns: 1fr; gap: 2px; }
 }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.02em; }
