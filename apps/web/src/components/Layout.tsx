@@ -2,7 +2,10 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Briefcase,
   CalendarDays,
+  FileLock2,
+  Users,
   FolderKanban,
   Home,
   Inbox,
@@ -18,6 +21,7 @@ import {
 } from 'lucide-react';
 import { api, type Dashboard, type Priority, type SearchResult, type NoteSummary } from '../api.ts';
 import { TYPE_LABEL, noteHref, useTheme, useToast, fmtDate } from './ui.tsx';
+import { entityHref } from '../entities.ts';
 
 const NAV = [
   { to: '/', label: 'Главная', icon: Home, end: true },
@@ -26,6 +30,9 @@ const NAV = [
   { to: '/projects', label: 'Проекты', icon: FolderKanban },
   { to: '/backlog', label: 'Бэклог', icon: Inbox, badge: 'backlog' as const },
   { to: '/ideas', label: 'Идеи', icon: Lightbulb, badge: 'ideas' as const },
+  { to: '/work', label: 'Работа', icon: Briefcase },
+  { to: '/contacts', label: 'Контакты', icon: Users, badge: 'followups' as const },
+  { to: '/documents', label: 'Документы', icon: FileLock2, badge: 'documents' as const },
 ];
 
 const TITLES: Record<string, string> = {
@@ -36,6 +43,13 @@ const TITLES: Record<string, string> = {
   '/projects/view': 'Проект',
   '/backlog': 'Бэклог',
   '/ideas': 'Идеи',
+  '/work': 'Работа',
+  '/work/view': 'Вакансия',
+  '/contacts': 'Клиенты и контакты',
+  '/contacts/view': 'Контакт',
+  '/contacts/company': 'Компания',
+  '/documents': 'Документы',
+  '/documents/view': 'Документ',
   '/note': 'Заметка',
   '/favorites': 'Избранное',
   '/settings': 'Настройки',
@@ -69,7 +83,12 @@ export function Layout() {
   }, []);
 
   const title = TITLES[loc.pathname] ?? 'Frame OS';
-  const badges = { backlog: dash.data?.backlogCount ?? 0, ideas: dash.data?.ideasNew ?? 0 };
+  const badges = {
+    backlog: dash.data?.backlogCount ?? 0,
+    ideas: dash.data?.ideasNew ?? 0,
+    followups: dash.data?.reminders?.followUps.filter((c) => c.followUp !== 'soon').length ?? 0,
+    documents: dash.data?.reminders?.documents.length ?? 0,
+  };
   const nextTheme = theme === 'system' ? 'dark' : theme === 'dark' ? 'light' : 'system';
 
   return (
@@ -224,7 +243,7 @@ function SearchPalette({ onClose }: { onClose: () => void }) {
     : (fav.data?.favorites ?? []).map((n) => ({ path: n.path, title: n.title, type: n.type, snippet: n.path }));
   const open = (path: string, type: string) => {
     onClose();
-    nav(type === 'project' ? `/projects/view?path=${encodeURIComponent(path)}` : noteHref(path));
+    nav(entityHref(type, path));
   };
   return (
     <Modal onClose={onClose} label="Поиск">

@@ -87,9 +87,10 @@ describe('Life: проекты, цели, циклы, идеи', () => {
   it('считает прогресс и следующий шаг проекта', async () => {
     const { life } = await openSample();
     const p = life.projects().find((x) => x.title === 'Поиск работы')!;
-    expect(p.tasksTotal).toBe(9);
+    // 9 задач в заметке проекта + по одной в вакансиях Acme и Gamma (свойство project).
+    expect(p.tasksTotal).toBe(11);
     expect(p.tasksDone).toBe(2);
-    expect(p.progress).toBe(22);
+    expect(p.progress).toBe(18);
     expect(p.tasksOverdue).toBe(1);
     expect(p.nextStep).toBe('Ответить рекрутеру Анне');
     expect(p.goal?.title).toBe('Найти работу продакт-менеджером');

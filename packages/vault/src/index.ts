@@ -5,3 +5,4 @@ export * from './search.ts';
 export * from './tasks.ts';
 export * from './vault.ts';
 export * from './life.ts';
+export * from './crm.ts';

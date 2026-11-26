@@ -10,7 +10,16 @@ import type {
   TaskDTO,
   CalendarItem,
   FolderConfig,
+  VacancyDTO,
+  ContactDTO,
+  CompanyDTO,
+  DocumentDTO,
+  MaterialDTO,
+  HistoryEntry,
+  Ref,
 } from '@frame-os/vault';
+
+export type { VacancyDTO, ContactDTO, CompanyDTO, DocumentDTO, MaterialDTO, HistoryEntry, Ref };
 
 export type { CalendarDay, CalendarItem, CycleDTO, GoalDTO, IdeaDTO, NoteSummary, Priority, ProjectDTO, TaskDTO, FolderConfig };
 
@@ -87,6 +96,57 @@ export interface Dashboard {
   ideasNew: number;
   priorities: string;
   dailyPath: string | null;
+  reminders: {
+    followUps: ContactDTO[];
+    documents: DocumentDTO[];
+    interviews: VacancyDTO[];
+    vacanciesActive: number;
+  };
+}
+
+type Related = Array<NoteSummary & { direction: 'out' | 'in' | 'both' }>;
+
+export interface WorkData {
+  today: string;
+  vacancies: VacancyDTO[];
+  byStatus: Record<string, number>;
+  active: number;
+  responseRate: number | null;
+  interviews: VacancyDTO[];
+  attention: VacancyDTO[];
+  materials: MaterialDTO[];
+  companies: CompanyDTO[];
+}
+
+export interface VacancyDetail extends VacancyDTO {
+  description: string;
+  coverLetter: string;
+  interviews: string;
+  history: HistoryEntry[];
+  tasks: TaskDTO[];
+  related: Related;
+}
+
+export interface ContactDetail extends ContactDTO {
+  notes: string;
+  history: HistoryEntry[];
+  agreements: TaskDTO[];
+  tasks: TaskDTO[];
+  vacancies: Array<{ path: string; title: string; status: string }>;
+  related: Related;
+}
+
+export interface CompanyDetail extends CompanyDTO {
+  notes: string;
+  history: HistoryEntry[];
+  tasks: TaskDTO[];
+  related: Related;
+  documents: DocumentDTO[];
+}
+
+export interface DocumentDetail extends DocumentDTO {
+  tasks: TaskDTO[];
+  related: Related;
 }
 
 export interface DayData {

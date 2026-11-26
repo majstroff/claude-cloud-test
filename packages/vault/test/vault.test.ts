@@ -29,6 +29,7 @@ describe('Vault: чтение', () => {
     const goal = project.links.find((l) => l.key === 'goal');
     expect(goal?.resolved).toBe('Areas/Goals/Найти работу продакт-менеджером.md');
     expect(vault.backlinks('Resources/Контакты/Анна Смирнова.md')).toEqual([
+      'Areas/Работа/Вакансии/Product Manager — Acme.md',
       'Inbox/Заметки с созвона с Анной.md',
       'Projects/Поиск работы.md',
     ]);

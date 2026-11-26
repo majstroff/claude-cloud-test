@@ -16,6 +16,10 @@ const FOLDER_LABELS: Array<[keyof FolderConfig, string]> = [
   ['inbox', 'Входящие'],
   ['daily', 'Ежедневные заметки'],
   ['events', 'Календарь / события'],
+  ['work', 'Работа (вакансии и материалы)'],
+  ['contacts', 'Контакты'],
+  ['companies', 'Компании'],
+  ['documents', 'Документы'],
 ];
 
 export function SettingsPage() {

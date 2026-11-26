@@ -3,6 +3,7 @@ import path from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import {
+  Crm,
   Life,
   Vault,
   VaultError,
@@ -16,6 +17,7 @@ import {
   type TaskView,
 } from '@frame-os/vault';
 import { StateStore } from './state.ts';
+import { registerCrmRoutes } from './crm-routes.ts';
 import { KNOWN_INTEGRATIONS, registerIntegrations, type IntegrationStatus } from './integrations.ts';
 
 export interface AppOptions {
@@ -51,14 +53,16 @@ const PRIORITIES: Priority[] = ['highest', 'high', 'medium', 'none', 'low', 'low
 const TASK_VIEWS: TaskView[] = ['today', 'overdue', 'upcoming', 'backlog', 'done', 'open', 'all'];
 const FOLDER_KEYS: Array<keyof FolderConfig> = [
   'projects', 'areas', 'resources', 'archive', 'goals', 'cycles', 'ideas', 'inbox', 'daily', 'events',
+  'work', 'contacts', 'companies', 'documents',
 ];
 
-export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { vault: Vault; life: Life }> {
+export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { vault: Vault; life: Life; crm: Crm }> {
   const app = Fastify({ logger: opts.logger ?? false, bodyLimit: 6 * 1024 * 1024 });
   const state = new StateStore(opts.dataDir);
   const saved = await state.load();
   const vault = await Vault.open({ root: opts.vaultPath, clock: opts.clock, folders: saved.folders });
   const life = new Life(vault);
+  const crm = new Crm(life);
   if (opts.watch) vault.watch();
   app.addHook('onClose', async () => vault.unwatch());
 
@@ -303,7 +307,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
   });
 
   // --- Главная, день, календарь ---
-  app.get('/api/dashboard', async () => life.dashboard());
+  app.get('/api/dashboard', async () => ({ ...life.dashboard(), reminders: crm.reminders() }));
 
   app.get('/api/day', async (req) => {
     const date = str(query(req).date) ?? vault.today();
@@ -420,6 +424,8 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
     return { path: n.path, status };
   });
 
+  registerCrmRoutes(app, crm);
+
   app.all('/api/*', async (req, reply) => reply.code(404).send({ error: `Нет такого метода API: ${req.method} ${req.url.split('?')[0]}` }));
 
   // --- Интерфейс ---
@@ -437,9 +443,10 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
     );
   }
 
-  const out = app as unknown as FastifyInstance & { vault: Vault; life: Life };
+  const out = app as unknown as FastifyInstance & { vault: Vault; life: Life; crm: Crm };
   out.vault = vault;
   out.life = life;
+  out.crm = crm;
   return out;
 }
 

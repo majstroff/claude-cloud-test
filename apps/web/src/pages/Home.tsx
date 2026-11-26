@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, CalendarClock, CheckCircle2, FolderKanban, Target } from 'lucide-react';
+import { ArrowRight, BellRing, CalendarClock, CheckCircle2, FolderKanban, Target } from 'lucide-react';
+import { entityHref } from '../entities.ts';
 import { api, type Dashboard, type CycleDTO } from '../api.ts';
 import { AddTaskInline, TaskList } from '../components/TaskList.tsx';
 import { MonthCalendar } from '../components/Calendar.tsx';
 import { TodoistPanel } from '../components/Todoist.tsx';
-import { Empty, ErrorBox, Loading, Progress, TYPE_LABEL, noteHref, plural, relDate } from '../components/ui.tsx';
+import { Empty, ErrorBox, Loading, Progress, TYPE_LABEL, plural, relDate } from '../components/ui.tsx';
 
 export function HomePage() {
   const q = useQuery({ queryKey: ['dashboard'], queryFn: () => api.get<Dashboard>('/api/dashboard') });
@@ -72,7 +73,7 @@ export function HomePage() {
               <ul className="list">
                 {[...d.todayEvents.map((e) => ({ ...e, date: d.today })), ...d.events].map((e, i) => (
                   <li key={`${e.path}-${i}`}>
-                    <Link to={noteHref(e.path)}>
+                    <Link to={entityHref(e.kind === 'task' ? 'note' : e.noteType, e.path)}>
                       <span className={`type-dot ${e.kind === 'deadline' ? '' : e.kind === 'event' ? e.noteType : ''}`} style={e.kind === 'deadline' ? { background: 'var(--red)' } : undefined} />
                       <span className="li-main">
                         <div className="li-title">{e.title}</div>
@@ -124,6 +125,7 @@ export function HomePage() {
 
         <div className="stack">
           <CycleHero cycle={d.cycle} />
+          <RemindersCard d={d} />
           <section className="card">
             <div className="card-head">
               <h2 className="card-title">
@@ -145,6 +147,65 @@ export function HomePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Кому пора написать, какие документы продлить, ближайшие собеседования. */
+function RemindersCard({ d }: { d: Dashboard }) {
+  const r = d.reminders;
+  const total = r.followUps.length + r.documents.length + r.interviews.length;
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h2 className="card-title">
+          <BellRing size={16} /> Напоминания
+        </h2>
+        <Link to="/work" className="btn small ghost">
+          Вакансий в работе · {r.vacanciesActive}
+        </Link>
+      </div>
+      {total === 0 ? (
+        <Empty title="Ничего не горит">Здесь появятся контакты, с которыми пора связаться, документы на продление и собеседования.</Empty>
+      ) : (
+        <ul className="list">
+          {r.interviews.map((v) => (
+            <li key={v.path}>
+              <Link to={entityHref('vacancy', v.path)}>
+                <span className="type-dot vacancy" />
+                <span className="li-main">
+                  <div className="li-title">Собеседование: {v.title}</div>
+                  <div className="li-sub">{relDate(v.interview!, d.today)}{v.interviewTime ? ` · ${v.interviewTime}` : ''}</div>
+                </span>
+              </Link>
+            </li>
+          ))}
+          {r.followUps.map((c) => (
+            <li key={c.path}>
+              <Link to={entityHref('contact', c.path)}>
+                <span className="type-dot contact" />
+                <span className="li-main">
+                  <div className="li-title">Связаться: {c.title}</div>
+                  <div className="li-sub" style={{ color: c.followUp === 'overdue' ? 'var(--red)' : undefined }}>{relDate(c.nextContact!, d.today)}{c.company ? ` · ${c.company.title}` : ''}</div>
+                </span>
+              </Link>
+            </li>
+          ))}
+          {r.documents.map((doc) => (
+            <li key={doc.path}>
+              <Link to={entityHref('document', doc.path)}>
+                <span className="type-dot document" />
+                <span className="li-main">
+                  <div className="li-title">{doc.state === 'expired' ? 'Истёк' : 'Продлить'}: {doc.title}</div>
+                  <div className="li-sub" style={{ color: doc.state === 'expired' ? 'var(--red)' : undefined }}>
+                    действует до {relDate(doc.expires!, d.today)}{doc.renewalTask ? ' · задача создана' : ''}
+                  </div>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
