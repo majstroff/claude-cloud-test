@@ -78,7 +78,7 @@ export function MonthCalendar({
               <span className="n">{parseIso(d.date).getDate()}</span>
               <span className="dots">
                 {[...kinds].map((k) => (
-                  <i key={k} className={k} />
+                  <i key={k} className={`k-${k}`} />
                 ))}
               </span>
             </button>

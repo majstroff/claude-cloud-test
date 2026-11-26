@@ -6,10 +6,10 @@ import { api, type FolderConfig, type Health, type NoteSummary } from '../api.ts
 import { Empty, ErrorBox, Loading, TYPE_LABEL, noteHref, useTheme, useToast } from '../components/ui.tsx';
 
 const FOLDER_LABELS: Array<[keyof FolderConfig, string]> = [
-  ['projects', 'Проекты (PARA: Projects)'],
-  ['areas', 'Сферы (PARA: Areas)'],
-  ['resources', 'Ресурсы (PARA: Resources)'],
-  ['archive', 'Архив (PARA: Archive)'],
+  ['projects', 'Проекты'],
+  ['areas', 'Сферы ответственности'],
+  ['resources', 'Ресурсы'],
+  ['archive', 'Архив'],
   ['goals', 'Цели'],
   ['cycles', '12-недельные циклы'],
   ['ideas', 'Идеи'],
@@ -63,7 +63,7 @@ export function SettingsPage() {
       <div className="stack">
         <section className="card">
           <div className="card-head">
-            <h2 className="card-title">Obsidian Vault</h2>
+            <h2 className="card-title">Хранилище Obsidian</h2>
             <button className="btn small" onClick={() => reindex.mutate()} disabled={reindex.isPending}>
               <RefreshCw size={14} /> Перечитать
             </button>

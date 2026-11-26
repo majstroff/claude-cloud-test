@@ -93,6 +93,10 @@ try {
     await expectText('Активные проекты');
     await expectText('Поиск работы');
     await expectText('неделя цикла');
+    await expectText('каждую неделю');
+    for (const name of ['Главная', 'Сегодня', 'Стратегия', 'Проекты', 'Бэклог', 'Идеи']) {
+      await page.getByRole('link', { name, exact: true }).first().waitFor({ state: 'attached' });
+    }
     await shot('home');
   });
 
@@ -128,7 +132,7 @@ try {
     if (!/## Итог дня\nИтог из e2e/.test(raw)) throw new Error('Итог не записан');
   });
 
-  await step('Неделя и месяц в Today', async () => {
+  await step('Неделя и месяц в разделе «Сегодня»', async () => {
     await page.getByRole('tab', { name: 'Неделя' }).click();
     await page.locator('.week .col').first().waitFor();
     await page.getByRole('tab', { name: 'Месяц' }).click();
@@ -160,7 +164,7 @@ try {
     await shot('project');
   });
 
-  await step('Strategy показывает цели, цикл и новый проект под целью', async () => {
+  await step('«Стратегия» показывает цели, цикл и новый проект под целью', async () => {
     await page.goto(`${base}/strategy`);
     await expectText('Найти работу продакт-менеджером');
     await expectText('E2E проект');
@@ -179,7 +183,7 @@ try {
     await shot('ideas');
   });
 
-  await step('Backlog: фильтр и перенос задачи на сегодня', async () => {
+  await step('Бэклог: фильтр и перенос задачи на сегодня', async () => {
     await page.goto(`${base}/backlog`);
     await page.getByLabel('Поиск по задачам').fill('утеплитель');
     const item = page.locator('li.task', { hasText: 'Выбрать утеплитель' });
@@ -208,7 +212,8 @@ try {
     await shot('home-dark');
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(base);
-    await expectText('Сегодня');
+    await page.getByRole('heading', { name: 'Главная' }).waitFor();
+    await page.locator('li.task').first().waitFor();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     if (overflow) throw new Error('Горизонтальная прокрутка на мобильной ширине');
     await shot('home-mobile');

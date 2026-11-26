@@ -25,6 +25,31 @@ export function useTaskAction() {
   });
 }
 
+/** Правило повтора из Obsidian Tasks (every week) — по-русски. */
+export function recurrenceRu(rule: string): string {
+  const r = rule.trim().toLowerCase();
+  const whenDone = /\s+when done$/.test(r);
+  const m = /^every\s+(\d+\s+)?(day|days|week|weeks|month|months|year|years)(\s+when done)?$/.exec(r);
+  if (!m) return rule;
+  const n = m[1] ? Number(m[1]) : 1;
+  const unit = m[2]!.replace(/s$/, '');
+  const forms: Record<string, [string, string, string, string]> = {
+    day: ['каждый день', 'дня', 'дня', 'дней'],
+    week: ['каждую неделю', 'недели', 'недели', 'недель'],
+    month: ['каждый месяц', 'месяца', 'месяца', 'месяцев'],
+    year: ['каждый год', 'года', 'года', 'лет'],
+  };
+  const f = forms[unit]!;
+  let text: string;
+  if (n === 1) text = f[0];
+  else {
+    const m10 = n % 10, m100 = n % 100;
+    const word = m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20) ? f[2] : f[3];
+    text = `раз в ${n} ${word}`;
+  }
+  return whenDone ? `${text} после выполнения` : text;
+}
+
 const PRIO_LABEL: Record<Priority, string> = {
   highest: 'Срочно',
   high: 'Высокий',
@@ -69,7 +94,7 @@ export function TaskItem({ task, today, showSource = true }: { task: TaskDTO; to
           )}
           {task.recurrence && (
             <span className="chip">
-              <Repeat size={11} /> {task.recurrence}
+              <Repeat size={11} /> {recurrenceRu(task.recurrence)}
             </span>
           )}
           {showSource && (
@@ -98,7 +123,7 @@ export function TaskItem({ task, today, showSource = true }: { task: TaskDTO; to
               aria-label="Дата"
             />
             <button className="btn small primary" disabled={!customDate} onClick={() => run({ action: 'setDue', due: customDate })}>
-              OK
+              Применить
             </button>
             {task.due && (
               <button className="btn small ghost" onClick={() => run({ action: 'setDue', due: null })}>

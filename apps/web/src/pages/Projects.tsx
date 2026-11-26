@@ -69,7 +69,7 @@ export function ProjectsPage() {
             title={q.data.projects.length === 0 ? 'В хранилище пока нет проектов' : 'Нет проектов по этому фильтру'}
             action={q.data.projects.length === 0 ? <button className="btn small" onClick={() => setCreating(true)}>Создать первый проект</button> : undefined}
           >
-            {q.data.projects.length === 0 && 'Проект — это заметка в папке Projects или с type: project.'}
+            {q.data.projects.length === 0 && 'Проект — это заметка в папке проектов или со свойством type: project.'}
           </Empty>
         </div>
       ) : (
