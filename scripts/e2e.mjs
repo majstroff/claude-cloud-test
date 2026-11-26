@@ -503,6 +503,15 @@ try {
     if (r.status !== 403) throw new Error(`Ожидался отказ, получено ${r.status}`);
   });
 
+  await step('Удаление заметки с подтверждением в корзину Obsidian', async () => {
+    await page.goto(`${base}/ideas`);
+    await page.getByRole('button', { name: 'Удалить: Telegram-канал о продуктовой аналитике' }).click();
+    await page.getByRole('button', { name: 'Да, удалить' }).click();
+    await expectText('лежит в корзине Obsidian');
+    await fs.access(path.join(vault, '.trash/Telegram-канал о продуктовой аналитике.md'));
+    if ((await page.getByText('Telegram-канал о продуктовой аналитике').count()) > 0) throw new Error('Идея осталась в списке');
+  });
+
   await step('Тёмная тема и мобильная ширина', async () => {
     await page.goto(base);
     await page.getByRole('button', { name: 'Сменить тему' }).click();

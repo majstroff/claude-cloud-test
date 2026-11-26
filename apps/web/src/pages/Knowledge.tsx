@@ -8,6 +8,7 @@ import { useAct } from '../components/Spheres.tsx';
 import { AddTaskInline, TaskList } from '../components/TaskList.tsx';
 import { Empty, ErrorBox, Loading, TYPE_LABEL, fmtDate, noteHref, plural } from '../components/ui.tsx';
 import { KNOWLEDGE_FIELDS, KNOWLEDGE_STATUS_LABEL, KNOWLEDGE_TYPE_LABEL, PARA_LABEL, entityHref, fieldsFor } from '../entities.ts';
+import { DeleteNoteButton } from '../components/DeleteNote.tsx';
 
 const CREATE_TYPES = ['note', 'instruction', 'research', 'bookmark'] as const;
 
@@ -316,6 +317,7 @@ export function KnowledgeItemPage() {
               <Link className="btn small" to={noteHref(n.path)}>
                 <FileText size={14} /> Открыть и править
               </Link>
+              <DeleteNoteButton path={n.path} title={n.title} after="/knowledge" />
             </div>
             {n.question && <div style={{ marginTop: 12 }}><span className="muted small">Вопрос:</span> {n.question}</div>}
             {n.why && <div style={{ marginTop: 12 }}><span className="muted small">Зачем:</span> {n.why}</div>}

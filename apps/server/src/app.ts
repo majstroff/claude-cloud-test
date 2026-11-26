@@ -257,6 +257,17 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
     return { path: n.path };
   });
 
+  app.post('/api/note/trash', async (req) => {
+    const b = obj(req.body);
+    const rel = required(str(b.path), 'path');
+    if (b.confirmed !== true) throw new HttpError(400, 'Удаление требует подтверждения');
+    const res = await vault.trash(rel);
+    await state.update((s) => {
+      s.favorites = s.favorites.filter((f) => f !== rel);
+    });
+    return res;
+  });
+
   // --- Избранное ---
   app.get('/api/favorites', async () => ({
     favorites: state

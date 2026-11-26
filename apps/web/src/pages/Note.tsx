@@ -8,6 +8,7 @@ import { api, ApiError, type Health, type NoteData, type NoteSummary } from '../
 import { TaskList } from '../components/TaskList.tsx';
 import { Empty, ErrorBox, Loading, TYPE_LABEL, noteHref, useToast } from '../components/ui.tsx';
 import { useFavorite } from './Projects.tsx';
+import { DeleteNoteButton } from '../components/DeleteNote.tsx';
 
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -83,6 +84,7 @@ export function NotePage() {
             <button className="btn small icon" aria-label={n.favorite ? 'Убрать из избранного' : 'В избранное'} onClick={() => fav.mutate({ path: n.path, favorite: !n.favorite })}>
               <Star size={14} fill={n.favorite ? 'currentColor' : 'none'} />
             </button>
+            {!editing && <DeleteNoteButton path={n.path} title={n.title} />}
             {!editing && (
               <button className="btn small" onClick={() => setEditing(true)}>
                 <Pencil size={14} /> Редактировать

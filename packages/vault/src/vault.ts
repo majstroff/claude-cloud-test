@@ -700,6 +700,24 @@ export class Vault {
     return this.require(destRel);
   }
 
+  /**
+   * Удаление в корзину Obsidian: файл переносится в `.trash` внутри хранилища
+   * (так же делает сам Obsidian), его можно вернуть вручную. Безвозвратно не удаляется.
+   */
+  async trash(rel: string): Promise<{ from: string; to: string }> {
+    const src = this.safePath(rel);
+    if (!(await exists(src))) throw new VaultError(`Заметка не найдена: ${rel}`, 'not_found');
+    const trashDir = path.join(this.root, '.trash');
+    await fs.mkdir(trashDir, { recursive: true });
+    const base = path.posix.basename(rel, '.md');
+    let name = `${base}.md`;
+    for (let i = 2; await exists(path.join(trashDir, name)); i++) name = `${base} ${i}.md`;
+    await fs.rename(src, path.join(trashDir, name));
+    this.dropNote(rel);
+    this.emit([rel]);
+    return { from: rel, to: `.trash/${name}` };
+  }
+
   dailyPath(date: string): string {
     const [y, m, d] = date.split('-');
     const name = this.folders.dailyFormat.replace('YYYY', y!).replace('MM', m!).replace('DD', d!);

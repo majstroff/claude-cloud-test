@@ -148,3 +148,20 @@ describe('Помощник (локальные правила)', () => {
     expect(a.nextStep('Areas/Работа/Вакансии/Product Manager — Acme.md')).toMatchObject({ title: 'Отправить благодарность после первого интервью' });
   });
 });
+
+describe('Удаление заметок', () => {
+  it('переносит файл в корзину Obsidian (.trash), не стирая его', async () => {
+    const { vault, dir } = await setup();
+    const rel = 'Inbox/Ideas/Курс по SQL для продактов.md';
+    const before = await read(dir, rel);
+    const r = await vault.trash(rel);
+    expect(r).toEqual({ from: rel, to: '.trash/Курс по SQL для продактов.md' });
+    expect(vault.get(rel)).toBeUndefined();
+    expect(await read(dir, r.to)).toBe(before);
+    await fs.writeFile(path.join(dir, rel), 'снова');
+    await vault.refresh(rel);
+    expect((await vault.trash(rel)).to).toBe('.trash/Курс по SQL для продактов 2.md');
+    await expect(vault.trash('Нет такой.md')).rejects.toThrow(/не найдена/);
+    await expect(vault.trash('../вне.md')).rejects.toThrow();
+  });
+});

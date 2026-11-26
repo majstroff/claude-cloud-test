@@ -9,6 +9,7 @@ import { Empty, ErrorBox, Loading, fmtDate, noteHref, plural, relDate, useToast 
 import { COMPANY_FIELDS, COMPANY_KIND_LABEL, CONTACT_FIELDS, CONTACT_KIND_LABEL, RELATION_STATUS_LABEL, entityHref } from '../entities.ts';
 import { VacancyStatusChip } from './Work.tsx';
 import { PersonRelationsCard } from '../components/Personal.tsx';
+import { DeleteNoteButton } from '../components/DeleteNote.tsx';
 
 type ContactsData = { today: string; contacts: ContactDTO[]; companies: CompanyDTO[] };
 
@@ -282,6 +283,7 @@ export function ContactPage() {
               <Link className="btn small" to={noteHref(c.path)}>
                 <FileText size={14} /> Заметка
               </Link>
+              <DeleteNoteButton path={c.path} title={c.title} after="/contacts" />
             </div>
             <div className="row" style={{ marginTop: 12 }}>
               {c.phone && (
@@ -393,6 +395,7 @@ export function CompanyPage() {
               <Link className="btn small" to={noteHref(c.path)}>
                 <FileText size={14} /> Заметка
               </Link>
+              <DeleteNoteButton path={c.path} title={c.title} after="/contacts" />
             </div>
           </section>
           <div className="grid cols-2">

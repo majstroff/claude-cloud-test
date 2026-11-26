@@ -37,6 +37,7 @@ import {
 import { ProgressForm } from './Learning.tsx';
 import { GiftsCard, bookingWhen, inDays } from '../components/Personal.tsx';
 import { BOOKING_KIND_LABEL, DATE_KIND_LABEL } from '../entities.ts';
+import { DeleteNoteButton } from '../components/DeleteNote.tsx';
 
 const BACK: Record<string, [string, string]> = {
   subscription: ['/finance?tab=regular', 'Финансы'],
@@ -121,6 +122,7 @@ function Shell({ path, title, sub, chips, children, side, type }: { path: string
             <Link className="btn small" to={noteHref(path)}>
               <FileText size={14} /> Заметка
             </Link>
+            <DeleteNoteButton path={path} title={title} />
           </div>
         </section>
         {children}

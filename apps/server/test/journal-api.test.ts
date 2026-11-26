@@ -78,3 +78,15 @@ describe('API: помощник', () => {
     expect(await fs.readFile(path.join(vaultDir, 'Projects/Поиск работы.md'), 'utf8')).toBe(before);
   });
 });
+
+describe('API: удаление заметки', () => {
+  it('только с подтверждением и в корзину', async () => {
+    const rel = 'Inbox/Ideas/Курс по SQL для продактов.md';
+    expect((await send('POST', '/api/note/trash', { path: rel })).status).toBe(400);
+    expect((await send('POST', '/api/note/trash', { path: rel, confirmed: true }, { host: H.host })).status).toBe(403);
+    const r = await send('POST', '/api/note/trash', { path: rel, confirmed: true });
+    expect(r.body.to).toBe('.trash/Курс по SQL для продактов.md');
+    expect((await get(`/api/note?path=${q(rel)}`)).status).toBe(404);
+    await fs.access(path.join(vaultDir, '.trash/Курс по SQL для продактов.md'));
+  });
+});

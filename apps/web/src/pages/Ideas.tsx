@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FlaskConical, FolderPlus, ListPlus, Lightbulb, PauseCircle } from 'lucide-react';
 import { api, type IdeaDTO } from '../api.ts';
 import { Empty, ErrorBox, Loading, STATUS_LABEL, StatusChip, fmtDate, noteHref, useToast } from '../components/ui.tsx';
+import { DeleteNoteButton } from '../components/DeleteNote.tsx';
 
 const FILTERS = ['active', 'new', 'hypothesis', 'parked', 'converted', 'all'] as const;
 
@@ -146,6 +147,7 @@ function IdeaCard({ idea }: { idea: IdeaDTO }) {
               <PauseCircle size={14} /> Отложить
             </button>
           )}
+          <DeleteNoteButton path={idea.path} title={idea.title} after={null} />
         </div>
       )}
     </div>
