@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, BellRing, CalendarClock, CheckCircle2, FolderKanban, Target } from 'lucide-react';
+import { ArrowRight, BellRing, CalendarClock, CheckCircle2, Dumbbell, FolderKanban, Repeat, Target, Wallet } from 'lucide-react';
 import { entityHref } from '../entities.ts';
 import { api, type Dashboard, type CycleDTO } from '../api.ts';
 import { AddTaskInline, TaskList } from '../components/TaskList.tsx';
 import { MonthCalendar } from '../components/Calendar.tsx';
 import { TodoistPanel } from '../components/Todoist.tsx';
+import { ObligationList, RoutineList } from '../components/Spheres.tsx';
+import { WorkoutLine } from './Health.tsx';
 import { Empty, ErrorBox, Loading, Progress, TYPE_LABEL, plural, relDate } from '../components/ui.tsx';
 
 export function HomePage() {
@@ -57,6 +59,8 @@ export function HomePage() {
           </section>
 
           <TodoistPanel today={d.today} />
+
+          <LifeCard d={d} />
 
           <section className="card">
             <div className="card-head">
@@ -150,10 +154,54 @@ export function HomePage() {
   );
 }
 
+/** Платежи на неделю, тренировки и регулярные дела на сегодня. */
+function LifeCard({ d }: { d: Dashboard }) {
+  const s = d.spheres;
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h2 className="card-title">
+          <Wallet size={16} /> Платежи на 7 дней
+        </h2>
+        <Link to="/finance" className="btn small ghost">
+          {s.obligations.length ? `${s.obligationsTotal.toLocaleString('ru-RU')} ₽` : 'Финансы'} <ArrowRight size={14} />
+        </Link>
+      </div>
+      <ObligationList items={s.obligations} today={d.today} empty="На неделю платежей нет" />
+      <div className="card-head" style={{ marginTop: 16 }}>
+        <h2 className="card-title">
+          <Dumbbell size={16} /> Тренировки сегодня
+        </h2>
+        <Link to="/health" className="btn small ghost">
+          Здоровье <ArrowRight size={14} />
+        </Link>
+      </div>
+      {s.workoutsToday.length === 0 ? (
+        <Empty title="Сегодня тренировок нет" />
+      ) : (
+        <ul className="list">
+          {s.workoutsToday.map((w) => (
+            <li key={w.path}>
+              <WorkoutLine w={w} today={d.today} />
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="card-head" style={{ marginTop: 16 }}>
+        <h2 className="card-title">
+          <Repeat size={16} /> Регулярное на сегодня
+        </h2>
+      </div>
+      {s.routinesDue.length === 0 ? <Empty title="Всё регулярное сделано" /> : <RoutineList routines={s.routinesDue} today={d.today} showSphere />}
+    </section>
+  );
+}
+
 /** Кому пора написать, какие документы продлить, ближайшие собеседования. */
 function RemindersCard({ d }: { d: Dashboard }) {
   const r = d.reminders;
-  const total = r.followUps.length + r.documents.length + r.interviews.length;
+  const warranties = d.spheres.warranties;
+  const total = r.followUps.length + r.documents.length + r.interviews.length + warranties.length;
   return (
     <section className="card">
       <div className="card-head">
@@ -199,6 +247,17 @@ function RemindersCard({ d }: { d: Dashboard }) {
                   <div className="li-sub" style={{ color: doc.state === 'expired' ? 'var(--red)' : undefined }}>
                     действует до {relDate(doc.expires!, d.today)}{doc.renewalTask ? ' · задача создана' : ''}
                   </div>
+                </span>
+              </Link>
+            </li>
+          ))}
+          {warranties.map((a) => (
+            <li key={a.path}>
+              <Link to={entityHref('appliance', a.path)}>
+                <span className="type-dot appliance" />
+                <span className="li-main">
+                  <div className="li-title">Гарантия заканчивается: {a.title}</div>
+                  <div className="li-sub">{relDate(a.warrantyUntil!, d.today)}</div>
                 </span>
               </Link>
             </li>

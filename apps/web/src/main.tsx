@@ -16,6 +16,12 @@ import { FavoritesPage, SettingsPage } from './pages/Settings.tsx';
 import { VacancyPage, WorkPage } from './pages/Work.tsx';
 import { CompanyPage, ContactPage, ContactsPage } from './pages/Contacts.tsx';
 import { DocumentPage, DocumentsPage } from './pages/Documents.tsx';
+import { FinancePage } from './pages/Finance.tsx';
+import { HealthPage } from './pages/Health.tsx';
+import { LearningPage } from './pages/Learning.tsx';
+import { PracticesPage } from './pages/Practices.tsx';
+import { HouseholdPage } from './pages/Household.tsx';
+import { ItemPage } from './pages/Item.tsx';
 import './styles.css';
 
 const queryClient = new QueryClient({
@@ -49,6 +55,12 @@ createRoot(document.getElementById('root')!).render(
               <Route path="contacts/company" element={<CompanyPage />} />
               <Route path="documents" element={<DocumentsPage />} />
               <Route path="documents/view" element={<DocumentPage />} />
+              <Route path="finance" element={<FinancePage />} />
+              <Route path="health" element={<HealthPage />} />
+              <Route path="learning" element={<LearningPage />} />
+              <Route path="practices" element={<PracticesPage />} />
+              <Route path="home" element={<HouseholdPage />} />
+              <Route path="item" element={<ItemPage />} />
               <Route path="note" element={<NotePage />} />
               <Route path="favorites" element={<FavoritesPage />} />
               <Route path="settings" element={<SettingsPage />} />

@@ -318,7 +318,7 @@ label.field { display: grid; gap: 6px; font-size: 12px; color: var(--text-2); }
 .phases .ph.on { color: #fff; }
 
 .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.list li > a, .list li > div.li {
+.list li > a, .list li > div.li, .list li > form.li {
   display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 12px;
 }
 .list li > a:hover { background: var(--surface-2); }
@@ -416,3 +416,43 @@ label.field { display: grid; gap: 6px; font-size: 12px; color: var(--text-2); }
   .timeline li { grid-template-columns: 1fr; gap: 2px; }
 }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.02em; }
+
+/* Этап 6: финансы, здоровье, обучение, практики, дом */
+.type-dot.subscription, .type-dot.debt, .type-dot.savings, .type-dot.budget, .type-dot.ledger { background: var(--green); }
+.type-dot.book, .type-dot.article, .type-dot.video, .type-dot.course, .type-dot.skill { background: var(--violet); }
+.type-dot.appliance, .type-dot.shopping, .type-dot.chores { background: var(--amber); }
+.type-dot.routine { background: var(--blue); }
+.money { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.money.plus { color: var(--green); }
+.money.minus { color: var(--text); }
+.inline-form { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.inline-form .input, .inline-form .select { height: 32px; padding: 0 10px; width: auto; min-width: 0; }
+.inline-form .input.grow { flex: 1 1 160px; }
+.bars { display: flex; align-items: flex-end; gap: 4px; height: 72px; }
+.bars .b { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; min-width: 0; height: 100%; }
+.bars .b i { display: block; width: 100%; border-radius: 4px 4px 2px 2px; background: var(--blue); min-height: 2px; }
+.bars .b i.empty { background: var(--surface-3); }
+.bars .b span { font-size: 10px; color: var(--text-3); }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table th { text-align: left; font-weight: 500; color: var(--text-3); padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.table td { padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.table td.r, .table th.r { text-align: right; }
+.table-wrap { overflow-x: auto; }
+.quote { border-left: 3px solid var(--violet); padding: 4px 12px; margin: 0; color: var(--text-2); }
+.moon { width: 44px; height: 44px; border-radius: 50%; background: var(--surface-3); position: relative; overflow: hidden; flex: 0 0 auto; }
+.moon i { position: absolute; inset: 0; border-radius: 50%; background: #f5e6a8; }
+@media (min-width: 821px) and (max-height: 940px) {
+  .rail { gap: 2px; padding: 8px 6px; }
+  .rail a, .rail button { width: 34px; height: 34px; border-radius: 10px; }
+  .rail .badge { top: 1px; right: 1px; }
+}
+@media (min-width: 821px) and (max-height: 760px) {
+  .rail a, .rail button { width: 30px; height: 30px; }
+  .rail svg { width: 16px; height: 16px; }
+}
+.progress.red > div { background: var(--red); }
+/* На узком экране чипы и кнопки строки переносятся под название, а не выходят за край. */
+@media (max-width: 640px) {
+  .list li > div.li, .list li > form.li { flex-wrap: wrap; }
+  .list li > div.li .li-main, .list li > form.li .li-main { flex-basis: calc(100% - 20px); }
+}

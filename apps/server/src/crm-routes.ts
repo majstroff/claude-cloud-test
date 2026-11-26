@@ -3,13 +3,18 @@
  * Все записи — Markdown-заметки в Vault; здесь только проверка входных данных.
  */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { ENTITY_TYPES, VACANCY_STATUSES, VaultError, type Crm, type EntityType, type VacancyStatus } from '@frame-os/vault';
+import { ENTITY_TYPES, VACANCY_STATUSES, VaultError, type Crm, type EntityType, type Spheres, type VacancyStatus } from '@frame-os/vault';
 
-export function registerCrmRoutes(app: FastifyInstance, crm: Crm): void {
+export function registerCrmRoutes(app: FastifyInstance, crm: Crm, spheres?: Spheres): void {
   // --- Общее для всех сущностей ---
   app.post('/api/entities', async (req) => {
     const b = body(req);
     const type = text(b.type) as EntityType | null;
+    const owner = type ? spheres?.ownerOf(type) : null;
+    if (type && owner) {
+      const n = await owner.createEntity({ type, title: required(text(b.title), 'название'), fields: record(b.fields), text: text(b.text) ?? undefined });
+      return { path: n.path, title: n.title };
+    }
     if (!type || !ENTITY_TYPES.includes(type)) throw new VaultError('Неизвестный тип записи', 'invalid');
     const n = await crm.createEntity({
       type,
@@ -23,13 +28,21 @@ export function registerCrmRoutes(app: FastifyInstance, crm: Crm): void {
 
   app.put('/api/entity', async (req) => {
     const b = body(req);
-    const n = await crm.updateEntity(required(text(b.path), 'path'), record(b.set));
+    const rel = required(text(b.path), 'path');
+    const owner = spheres?.ownerOf(crm.life.vault.require(rel).type);
+    const n = owner ? await owner.updateEntity(rel, record(b.set)) : await crm.updateEntity(rel, record(b.set));
     return { path: n.path };
   });
 
   app.put('/api/entity/section', async (req) => {
     const b = body(req);
     const section = text(b.section);
+    const rel = required(text(b.path), 'path');
+    const owner = spheres?.ownerOf(crm.life.vault.require(rel).type);
+    if (owner) {
+      if (!section || typeof b.content !== 'string') throw new VaultError('Не указана секция или текст', 'invalid');
+      return { path: (await owner.saveSection(rel, section, b.content)).path };
+    }
     if (section !== 'description' && section !== 'cover_letter' && section !== 'notes' && section !== 'comment') {
       throw new VaultError('Неизвестная секция', 'invalid');
     }

@@ -42,7 +42,7 @@ export function Loading({ rows = 3 }: { rows?: number }) {
   );
 }
 
-export function Progress({ value, tone }: { value: number; tone?: 'blue' | 'green' }) {
+export function Progress({ value, tone }: { value: number; tone?: 'blue' | 'green' | 'red' }) {
   const v = Math.max(0, Math.min(100, value));
   return (
     <div className={`progress ${tone ?? ''}`} role="progressbar" aria-valuenow={v} aria-valuemin={0} aria-valuemax={100}>
@@ -143,6 +143,13 @@ export function relDate(iso: string, today: string): string {
   if (diff < 7) return `${WEEKDAYS[parseIso(iso).getDay()]}, ${fmtDate(iso)}`;
   return fmtDate(iso);
 }
+/** Прошедшая дата без слова «просрочено»: «сегодня», «вчера», «20 ноября». */
+export function pastDate(iso: string, today: string): string {
+  const diff = Math.round((parseIso(today).getTime() - parseIso(iso).getTime()) / 86_400_000);
+  if (diff <= 0) return relDate(iso, today);
+  if (diff === 1) return 'вчера';
+  return fmtDate(iso);
+}
 export function plural(n: number, one: string, few: string, many: string): string {
   const m10 = n % 10;
   const m100 = n % 100;
@@ -169,6 +176,20 @@ export const TYPE_LABEL: Record<string, string> = {
   company: 'Компания',
   resume: 'Резюме',
   portfolio: 'Портфолио',
+  subscription: 'Подписка',
+  debt: 'Долг',
+  savings: 'Накопления',
+  budget: 'Бюджет',
+  ledger: 'Операции',
+  book: 'Книга',
+  article: 'Статья',
+  video: 'Видео',
+  course: 'Курс',
+  skill: 'Навык',
+  appliance: 'Техника',
+  routine: 'Регулярное',
+  shopping: 'Покупки',
+  chores: 'Бытовые дела',
 };
 
 export const STATUS_LABEL: Record<string, string> = {

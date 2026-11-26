@@ -1,8 +1,8 @@
 # Модуль Todoist (`@frame-os/todoist`)
 
-Модуль Frame OS для двусторонней синхронизации с Todoist. Работает с Todoist API версии 1 (`https://api.todoist.com/api/v1`): прежние версии API Todoist уже отключены.
+Модуль «Лёгкость ОС» для двусторонней синхронизации с Todoist. Работает с Todoist API версии 1 (`https://api.todoist.com/api/v1`): прежние версии API Todoist уже отключены.
 
-Todoist отвечает на вопрос «что сделать». Модуль держит локальную копию задач, чтобы Frame OS работал и без сети, и связывает задачи с заметками Obsidian (`obsidianPath` и ссылка `obsidian://` в описании задачи).
+Todoist отвечает на вопрос «что сделать». Модуль держит локальную копию задач, чтобы «Лёгкость» работал и без сети, и связывает задачи с заметками Obsidian (`obsidianPath` и ссылка `obsidian://` в описании задачи).
 
 ## Что умеет
 
@@ -39,7 +39,7 @@ Todoist отвечает на вопрос «что сделать». Модул
 2. Файл из `TODOIST_API_TOKEN_FILE` с правами только для владельца (`chmod 600`; файл с более широкими правами отклоняется).
 3. Системное хранилище ключей, сервис `frame-os`, аккаунт `todoist`:
    - macOS: `security add-generic-password -s frame-os -a todoist -w` (токен спросят интерактивно)
-   - Linux: `secret-tool store --label="Frame OS Todoist" service frame-os account todoist`
+   - Linux: `secret-tool store --label="Лёгкость ОС Todoist" service frame-os account todoist`
 
    Отключить: `TODOIST_USE_KEYCHAIN=0`.
 
@@ -49,7 +49,7 @@ Todoist отвечает на вопрос «что сделать». Модул
 
 ## Подключение к серверу
 
-В Frame OS модуль подключён в `apps/server/src/todoist.ts`: маршруты `/api/todoist/*` (полный список в начале `src/http.ts`), статус в `/api/health` и в Настройках, автосинхронизация каждые 5 минут. Удаление без `{ "confirmed": true }` возвращает 428.
+В «Лёгкости» модуль подключён в `apps/server/src/todoist.ts`: маршруты `/api/todoist/*` (полный список в начале `src/http.ts`), статус в `/api/health` и в Настройках, автосинхронизация каждые 5 минут. Удаление без `{ "confirmed": true }` возвращает 428.
 
 Дополнительный маршрут сервера `POST /api/todoist/backlog/send-vault-task` отправляет строку задачи из заметки в Todoist и ставит в ней метку `[todoist:: id]`. После каждой синхронизации выполнение сверяется в обе стороны: закрыли в Todoist — строка в Obsidian отмечается `✅`, отметили в Obsidian — задача закрывается в Todoist.
 

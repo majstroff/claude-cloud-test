@@ -20,6 +20,11 @@ const FOLDER_LABELS: Array<[keyof FolderConfig, string]> = [
   ['contacts', 'Контакты'],
   ['companies', 'Компании'],
   ['documents', 'Документы'],
+  ['finance', 'Финансы'],
+  ['health', 'Спорт и здоровье'],
+  ['learning', 'Чтение и обучение'],
+  ['practices', 'Практики'],
+  ['home', 'Дом'],
 ];
 
 export function SettingsPage() {
@@ -183,7 +188,7 @@ export function FavoritesPage() {
     <section className="card">
       {q.data.favorites.length === 0 ? (
         <Empty icon={<Star size={18} />} title="Избранного пока нет">
-          Отметьте звёздочкой проект или заметку, чтобы быстро возвращаться к ним. Избранное хранится в настройках Frame OS, а не в заметках.
+          Отметьте звёздочкой проект или заметку, чтобы быстро возвращаться к ним. Избранное хранится в настройках «Лёгкости», а не в заметках.
         </Empty>
       ) : (
         <ul className="list">

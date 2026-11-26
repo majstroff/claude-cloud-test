@@ -74,6 +74,15 @@ export interface FolderConfig {
   contacts: string;
   companies: string;
   documents: string;
+  /** Финансы: бюджет, операции, подписки, долги, накопления. */
+  finance: string;
+  /** Спорт и здоровье: тренировки и процедуры. */
+  health: string;
+  /** Чтение и обучение: книги, статьи, курсы, навыки. */
+  learning: string;
+  practices: string;
+  /** Дом: техника, покупки, бытовые дела. */
+  home: string;
   /** Формат имени файла ежедневной заметки (поддерживаются YYYY, MM, DD). */
   dailyFormat: string;
   dailyTemplate: string | null;
@@ -313,6 +322,11 @@ export class Vault {
       contacts: byBase(/^(contacts|people|контакты|люди)$/i, `${resources}/Контакты`),
       companies: byBase(/^(companies|organizations|компании|организации)$/i, `${resources}/Компании`),
       documents: byBase(/^(documents|docs|документы)$/i, `${areas}/Документы`),
+      finance: byBase(/^(finance|finances|money|финансы|деньги)$/i, `${areas}/Финансы`),
+      health: byBase(/^(health|sport|здоровье|спорт|спорт и здоровье)$/i, `${areas}/Здоровье`),
+      learning: byBase(/^(learning|study|обучение|чтение|чтение и обучение)$/i, `${resources}/Обучение`),
+      practices: byBase(/^(practices?|практики)$/i, `${areas}/Практики`),
+      home: byBase(/^(home|house|household|дом|быт)$/i, `${areas}/Дом`),
       daily,
       dailyFormat,
       dailyTemplate,

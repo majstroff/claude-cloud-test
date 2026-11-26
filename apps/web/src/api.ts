@@ -41,7 +41,7 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new ApiError(0, 'Сервер Frame OS недоступен. Проверьте, что он запущен (npm run dev или npm start).');
+    throw new ApiError(0, 'Сервер «Лёгкость ОС» недоступен. Проверьте, что он запущен (npm run dev или npm start).');
   }
   let data: unknown = null;
   try {
@@ -102,6 +102,7 @@ export interface Dashboard {
     interviews: VacancyDTO[];
     vacanciesActive: number;
   };
+  spheres: SpheresDashboard;
 }
 
 type Related = Array<NoteSummary & { direction: 'out' | 'in' | 'both' }>;
@@ -200,3 +201,36 @@ export interface SearchResult {
   snippet: string;
   note: NoteSummary;
 }
+
+// ---------- Финансы, здоровье, обучение, практики, дом ----------
+
+import type { Finance, Health as HealthModule, Learning, Practices, Household, Routines, Spheres } from '@frame-os/vault';
+export type {
+  TransactionDTO,
+  ObligationDTO,
+  SubscriptionDTO,
+  PaymentDTO,
+  DebtDTO,
+  SavingsDTO,
+  WorkoutDTO,
+  LearningItemDTO,
+  SkillDTO,
+  RoutineDTO,
+  ApplianceDTO,
+  MoonInfo,
+} from '@frame-os/vault';
+
+export type FinanceData = ReturnType<Finance['overview']>;
+export type FinanceItem = ReturnType<Finance['detail']>;
+export type SportData = ReturnType<HealthModule['overview']>;
+export type WorkoutDetail = ReturnType<HealthModule['workoutDetail']>;
+export type DayHealthData = ReturnType<HealthModule['dayHealth']>;
+export type LearningData = ReturnType<Learning['overview']>;
+export type LearningDetail = ReturnType<Learning['detail']>;
+export type PracticesData = ReturnType<Practices['overview']>;
+export type PracticeDay = ReturnType<Practices['day']>;
+export type HomeData = ReturnType<Household['overview']>;
+export type ApplianceDetail = ReturnType<Household['applianceDetail']>;
+export type RoutineDetail = ReturnType<Routines['detail']>;
+export type SpheresDashboard = ReturnType<Spheres['dashboard']>;
+export type SpheresDay = ReturnType<Spheres['day']>;

@@ -41,7 +41,7 @@ async function main() {
   });
   await app.listen({ host, port });
   const stats = app.vault.stats();
-  console.log(`Frame OS: http://${host === '::1' ? '[::1]' : host}:${port}`);
+  console.log(`Лёгкость ОС: http://${host === '::1' ? '[::1]' : host}:${port}`);
   console.log(`Хранилище: ${stats.root} — заметок: ${stats.notes}, задач: ${stats.tasks}`);
 
   const stop = async () => {
@@ -53,6 +53,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(`Не удалось запустить Frame OS: ${(e as Error).message}`);
+  console.error(`Не удалось запустить «Лёгкость ОС»: ${(e as Error).message}`);
   process.exit(1);
 });

@@ -6,6 +6,9 @@ import { api, type DayData, type Health } from '../api.ts';
 import { AddTaskInline, TaskList } from '../components/TaskList.tsx';
 import { MonthCalendar, useCalendar } from '../components/Calendar.tsx';
 import { TodoistPanel } from '../components/Todoist.tsx';
+import { MoonBadge, ObligationList, RoutineList } from '../components/Spheres.tsx';
+import { WorkoutLine } from './Health.tsx';
+import type { SpheresDay } from '../api.ts';
 import { Empty, ErrorBox, Loading, WEEKDAYS_SHORT, addDaysIso, fmtDate, noteHref, parseIso, useToast } from '../components/ui.tsx';
 
 type View = 'day' | 'week' | 'month';
@@ -143,6 +146,8 @@ function DayView({ date, today }: { date: string; today: string }) {
           )}
         </section>
 
+        <DayExtras date={date} today={today} />
+
         {d.isToday && <TodoistPanel today={today} />}
 
         {d.events.length > 0 && (
@@ -194,6 +199,66 @@ function DayView({ date, today }: { date: string; today: string }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Платежи, тренировки, регулярные дела и практики выбранного дня. */
+function DayExtras({ date, today }: { date: string; today: string }) {
+  const q = useQuery({ queryKey: ['spheres-day', date], queryFn: () => api.get<SpheresDay>(`/api/spheres/day?date=${date}`) });
+  if (q.isPending) return <div className="card"><Loading rows={2} /></div>;
+  if (q.isError) return <ErrorBox error={q.error} onRetry={() => q.refetch()} />;
+  const x = q.data;
+  const p = x.practices;
+  const practiceCount = p.practices.length + p.states.length + p.gratitude.length;
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h2 className="card-title">Регулярное, тренировки и платежи</h2>
+        <span className="row small muted" style={{ gap: 8 }}>
+          <MoonBadge moon={x.moon} />
+          {x.moon.phaseLabel}, {x.moon.lunarDay}-й лунный день
+        </span>
+      </div>
+      {x.obligations.length > 0 && (
+        <>
+          <div className="small muted" style={{ margin: '4px 8px' }}>Платежи</div>
+          <ObligationList items={x.obligations} today={today} />
+        </>
+      )}
+      {x.tomorrowObligations.length > 0 && (
+        <div className="small" style={{ margin: '6px 8px', color: 'var(--amber)' }}>
+          Завтра к оплате: {x.tomorrowObligations.map((o) => `${o.title}${o.amount ? ` (${o.amount.toLocaleString('ru-RU')} ₽)` : ''}`).join(', ')}
+        </div>
+      )}
+      {x.workouts.length > 0 && (
+        <>
+          <div className="small muted" style={{ margin: '10px 8px 4px' }}>Тренировки</div>
+          <ul className="list">
+            {x.workouts.map((w) => (
+              <li key={w.path}>
+                <WorkoutLine w={w} today={today} />
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {x.routines.length > 0 && (
+        <>
+          <div className="small muted" style={{ margin: '10px 8px 4px' }}>Регулярные дела</div>
+          <RoutineList routines={x.routines} today={today} showSphere />
+        </>
+      )}
+      {x.obligations.length === 0 && x.workouts.length === 0 && x.routines.length === 0 && (
+        <Empty title="Ни платежей, ни тренировок, ни регулярных дел на этот день" />
+      )}
+      <div className="small muted" style={{ margin: '12px 8px 0' }}>
+        {x.health.sleep !== null ? `Сон ${x.health.sleep} ч · ` : ''}
+        {x.health.water !== null ? `вода ${x.health.water} л · ` : ''}
+        {practiceCount ? `записей в практиках: ${practiceCount} · ` : ''}
+        <Link to="/health">здоровье</Link> · <Link to="/practices">практики</Link>
+        {p.intention ? <div style={{ marginTop: 4 }}>Намерение: {p.intention}</div> : null}
+      </div>
+    </section>
   );
 }
 
