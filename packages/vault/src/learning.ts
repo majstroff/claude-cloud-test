@@ -10,7 +10,8 @@
 import { addDays } from './dates.ts';
 import { EntityModule, fmDate, fmEnum, fmNum, fmStr, parseDatedLines, parseNumber, type EntitySpec, type Ref } from './entity-kit.ts';
 import { appendToSection, getSectionText } from './markdown.ts';
-import { VaultError, type Note } from './vault.ts';
+import { VaultError, mediaKind, type Note } from './vault.ts';
+import type { Readable } from 'node:stream';
 import type { Life, TaskDTO } from './life.ts';
 
 export const MATERIAL_TYPES = ['book', 'article', 'video', 'course'] as const;
@@ -18,6 +19,50 @@ export type MaterialType = (typeof MATERIAL_TYPES)[number];
 export const MATERIAL_TYPE_LABEL: Record<MaterialType, string> = { book: 'Книга', article: 'Статья', video: 'Видео', course: 'Курс' };
 export const LEARN_STATUSES = ['want', 'active', 'paused', 'done', 'dropped'] as const;
 export type LearnStatus = (typeof LEARN_STATUSES)[number];
+
+/** Предел размера одного файла: 4 ГБ (лекция или курс в хорошем качестве). */
+export const MAX_MEDIA_BYTES = 4 * 1024 ** 3;
+
+export interface MediaItemDTO {
+  /** audio / video — файл в хранилище; embed — видео YouTube/Rutube/Vimeo; link — прочая ссылка. */
+  kind: 'audio' | 'video' | 'embed' | 'link';
+  title: string;
+  file: string | null;
+  url: string | null;
+  embed: string | null;
+  line: number;
+  raw: string;
+  missing: boolean;
+}
+
+/** Адрес встраиваемого плеера для YouTube, Rutube и Vimeo. */
+export function videoEmbed(url: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  const host = u.hostname.replace(/^(www\.|m\.)/, '');
+  let id: string | null = null;
+  if (host === 'youtu.be') id = u.pathname.slice(1).split('/')[0] || null;
+  else if (host === 'youtube.com' || host === 'music.youtube.com') {
+    id = u.searchParams.get('v') ?? (/^\/(?:shorts|live|embed)\/([\w-]+)/.exec(u.pathname)?.[1] ?? null);
+  }
+  if (id && /^[\w-]{6,20}$/.test(id)) {
+    const t = Number.parseInt(u.searchParams.get('t') ?? u.searchParams.get('start') ?? '', 10);
+    return `https://www.youtube-nocookie.com/embed/${id}${t > 0 ? `?start=${t}` : ''}`;
+  }
+  if (host === 'rutube.ru') {
+    const r = /^\/video\/([0-9a-f]{20,40})/.exec(u.pathname)?.[1];
+    if (r) return `https://rutube.ru/play/embed/${r}`;
+  }
+  if (host === 'vimeo.com') {
+    const v = /^\/(\d+)/.exec(u.pathname)?.[1];
+    if (v) return `https://player.vimeo.com/video/${v}`;
+  }
+  return null;
+}
 
 export interface LearningItemDTO {
   path: string;
@@ -262,6 +307,83 @@ export class Learning extends EntityModule {
       return appendToSection(t, 'Цитаты', `${existing.trim() ? '\n' : ''}> ${text}${page}`).text;
     });
     return this.item(this.vault.require(rel));
+  }
+
+  // ---------- Медиа: аудио, видео и ссылки на видео ----------
+
+  private requireMediaOwner(rel: string): Note {
+    return this.requireType(rel, [...MATERIAL_TYPES, 'skill'], 'материал или навык');
+  }
+
+  /** Аудио и видео заметки: вложения ![[файл]] в любом разделе и ссылки из раздела «Медиа». */
+  async media(rel: string): Promise<MediaItemDTO[]> {
+    this.requireMediaOwner(rel);
+    const out: MediaItemDTO[] = [];
+    for (const sec of await this.vault.noteLines(rel)) {
+      const isMedia = /^(медиа|media|видео и аудио|аудио и видео)$/i.test(sec.heading.trim());
+      for (const it of sec.items) {
+        for (const m of it.raw.matchAll(/!\[\[([^\]|#]+)(?:\|([^\]]*))?\]\]/g)) {
+          const name = m[1]!.trim();
+          const kind = mediaKind(name);
+          if (!kind) continue;
+          const file = await this.vault.findAsset(name, rel);
+          const title = (m[2]?.trim() || name.split('/').pop()!.replace(/\.[^.]+$/, '')).trim();
+          out.push({ kind, title, file, url: null, embed: null, line: it.line, raw: it.raw, missing: !file });
+        }
+        if (!isMedia) continue;
+        const urlMatch = /(https?:\/\/[^\s)>\]]+)/.exec(it.raw);
+        if (!urlMatch) continue;
+        const url = urlMatch[1]!;
+        const md = /\[([^\]]+)\]\(https?:/.exec(it.raw);
+        const text = it.raw.replace(/^\s*[-*+]\s+/, '').replace(/\[([^\]]+)\]\([^)]*\)/, '$1').replace(url, '').replace(/[\s·—:-]+$/, '').trim();
+        const embed = videoEmbed(url);
+        out.push({ kind: embed ? 'embed' : 'link', title: md?.[1] ?? (text || url), file: null, url, embed, line: it.line, raw: it.raw, missing: false });
+      }
+    }
+    return out;
+  }
+
+  /** Прикрепляет загруженный файл: сохраняет в папку вложений и пишет ![[файл]] в раздел «Медиа». */
+  async attachMedia(rel: string, name: string, data: Readable, title?: string | null): Promise<MediaItemDTO[]> {
+    this.requireMediaOwner(rel);
+    const saved = await this.vault.saveAttachment(name, data, MAX_MEDIA_BYTES);
+    const fileName = saved.path.split('/').pop()!;
+    const alias = title?.trim() ? `|${title.trim().replace(/[\]|\n]/g, ' ')}` : '';
+    await this.vault.transform(rel, (t) => appendToSection(t, 'Медиа', `- ![[${fileName}${alias}]]`).text);
+    return this.media(rel);
+  }
+
+  /** Ссылка на видео или аудио в интернете (YouTube, Rutube, Vimeo, подкаст…). */
+  async addMediaLink(rel: string, input: { url: string; title?: string | null }): Promise<MediaItemDTO[]> {
+    this.requireMediaOwner(rel);
+    const url = String(input.url ?? '').trim();
+    if (!/^https?:\/\/[^\s]+$/i.test(url)) throw new VaultError('Ссылка должна начинаться с http:// или https://', 'invalid');
+    const title = input.title?.replace(/[\[\]\n]/g, ' ').replace(/\s+/g, ' ').trim();
+    await this.vault.transform(rel, (t) => appendToSection(t, 'Медиа', title ? `- [${title}](${url})` : `- ${url}`).text);
+    return this.media(rel);
+  }
+
+  /** Убирает медиа из заметки; файл вложения уходит в корзину Obsidian, если на него больше нет ссылок. */
+  async removeMedia(rel: string, input: { line: number; raw: string }) {
+    this.requireMediaOwner(rel);
+    const items = await this.media(rel);
+    const item = items.find((m) => m.raw === input.raw);
+    if (!item) throw new VaultError('Запись изменилась в Obsidian. Обновите страницу.', 'conflict');
+    const removed = await this.vault.editLine(rel, input.line, input.raw, null);
+    let trashed: { from: string; to: string } | null = null;
+    if (item.file) {
+      const name = item.file.split('/').pop()!;
+      const usedElsewhere = this.vault.all().some((n) => n.body.includes(`[[${name}`) || n.body.includes(`[[${item.file}`));
+      if (!usedElsewhere) trashed = await this.vault.trashAsset(item.file);
+    }
+    return { path: rel, line: removed.line, raw: input.raw, trashed };
+  }
+
+  async restoreMedia(rel: string, input: { line: number; raw: string; trashed?: { from: string; to: string } | null }) {
+    this.requireMediaOwner(rel);
+    if (input.trashed) await this.vault.restoreAsset(input.trashed);
+    await this.vault.insertLine(rel, input.line, input.raw);
+    return this.media(rel);
   }
 
   /** Практическое действие из материала — задача в секции «Действия». */

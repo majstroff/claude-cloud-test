@@ -1,6 +1,9 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { watch, type FSWatcher } from 'node:fs';
 import fs from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { pipeline } from 'node:stream/promises';
+import { Transform, type Readable } from 'node:stream';
 import path from 'node:path';
 import { systemClock, type Clock } from './dates.ts';
 import { buildNote, parseFrontmatter, splitFrontmatter, updateFrontmatter, type Frontmatter } from './frontmatter.ts';
@@ -754,6 +757,128 @@ export class Vault {
     });
   }
 
+  // ---------- Вложения: аудио и видео ----------
+
+  /** Папка вложений: как в настройках Obsidian (attachmentFolderPath), иначе «<Resources>/Вложения». */
+  async attachmentsFolder(): Promise<string> {
+    try {
+      const cfg = JSON.parse(await fs.readFile(path.join(this.root, '.obsidian', 'app.json'), 'utf8')) as { attachmentFolderPath?: string };
+      const f = (cfg.attachmentFolderPath ?? '').replace(/^\/+|\/+$/g, '');
+      if (f && !f.startsWith('.')) {
+        this.assertRelDir(f);
+        return f;
+      }
+    } catch {
+      /* настроек нет — папка по умолчанию */
+    }
+    return `${this.folders.resources || 'Resources'}/Вложения`;
+  }
+
+  /** Абсолютный путь к медиафайлу внутри хранилища (только аудио и видео, без служебных папок). */
+  assetPath(rel: string): string {
+    if (typeof rel !== 'string' || !rel.trim()) throw new VaultError('Не указан файл', 'invalid');
+    const clean = rel.replace(/\\/g, '/');
+    if (clean.startsWith('/') || /^[a-zA-Z]:/.test(clean)) throw new VaultError(`Недопустимый путь: ${rel}`, 'forbidden');
+    this.assertRelDir(clean);
+    if (!mediaKind(clean)) throw new VaultError('Поддерживаются только аудио и видео', 'forbidden');
+    const abs = path.resolve(this.root, clean);
+    if (!abs.startsWith(this.root + path.sep)) throw new VaultError(`Путь вне хранилища: ${rel}`, 'forbidden');
+    return abs;
+  }
+
+  /** Находит файл вложения по имени из ![[…]]: рядом с заметкой, в папке вложений или где угодно в хранилище. */
+  async findAsset(name: string, fromNote: string): Promise<string | null> {
+    const clean = name.replace(/\\/g, '/').trim();
+    if (!mediaKind(clean)) return null;
+    const candidates = [clean, `${path.posix.dirname(fromNote)}/${clean}`, `${await this.attachmentsFolder()}/${path.posix.basename(clean)}`];
+    for (const c of candidates) {
+      try {
+        if (await exists(this.assetPath(c))) return path.posix.normalize(c);
+      } catch {
+        /* недопустимый путь — пропускаем */
+      }
+    }
+    const base = path.posix.basename(clean).toLowerCase();
+    const walk = async (dir: string): Promise<string | null> => {
+      let entries: import('node:fs').Dirent[];
+      try {
+        entries = await fs.readdir(path.join(this.root, dir), { withFileTypes: true });
+      } catch {
+        return null;
+      }
+      for (const e of entries) {
+        if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+        const rel = dir ? `${dir}/${e.name}` : e.name;
+        if (e.isFile() && e.name.toLowerCase() === base) return rel;
+        if (e.isDirectory()) {
+          const r = await walk(rel);
+          if (r) return r;
+        }
+      }
+      return null;
+    };
+    return walk('');
+  }
+
+  /** Сохраняет загруженный файл в папку вложений; возвращает путь. maxBytes — предел размера. */
+  async saveAttachment(name: string, data: Readable, maxBytes: number): Promise<{ path: string; size: number }> {
+    const base = path.posix.basename(name.replace(/\\/g, '/')).replace(/[\x00-\x1f<>:"|?*#^[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!base || base.startsWith('.')) throw new VaultError('Некорректное имя файла', 'invalid');
+    if (!mediaKind(base)) throw new VaultError('Можно прикреплять аудио (mp3, m4a, aac, wav, flac, ogg, opus) и видео (mp4, m4v, mov, webm)', 'invalid');
+    const folder = await this.attachmentsFolder();
+    const ext = path.posix.extname(base);
+    const stem = base.slice(0, base.length - ext.length);
+    let rel = `${folder}/${base}`;
+    for (let i = 2; await exists(this.assetPath(rel)); i++) rel = `${folder}/${stem} ${i}${ext}`;
+    const abs = this.assetPath(rel);
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    const real = await fs.realpath(path.dirname(abs));
+    const realRoot = await fs.realpath(this.root);
+    if (real !== realRoot && !real.startsWith(realRoot + path.sep)) throw new VaultError('Путь вне хранилища', 'forbidden');
+    const tmp = path.join(path.dirname(abs), `.${path.basename(abs)}.${randomBytes(4).toString('hex')}.part`);
+    let size = 0;
+    const limit = new Transform({
+      transform(chunk: Buffer, _enc, cb) {
+        size += chunk.length;
+        if (size > maxBytes) cb(new VaultError(`Файл больше ${Math.round(maxBytes / 1024 ** 3)} ГБ`, 'invalid'));
+        else cb(null, chunk);
+      },
+    });
+    try {
+      await pipeline(data, limit, createWriteStream(tmp));
+      if (size === 0) throw new VaultError('Файл пустой', 'invalid');
+      await fs.rename(tmp, abs);
+    } catch (e) {
+      await fs.rm(tmp, { force: true });
+      throw e;
+    }
+    return { path: rel, size };
+  }
+
+  /** Переносит медиафайл в корзину Obsidian (.trash). */
+  async trashAsset(rel: string): Promise<{ from: string; to: string }> {
+    const src = this.assetPath(rel);
+    if (!(await exists(src))) throw new VaultError(`Файл не найден: ${rel}`, 'not_found');
+    const trashDir = path.join(this.root, '.trash');
+    await fs.mkdir(trashDir, { recursive: true });
+    const ext = path.posix.extname(rel);
+    const stem = path.posix.basename(rel, ext);
+    let name = `${stem}${ext}`;
+    for (let i = 2; await exists(path.join(trashDir, name)); i++) name = `${stem} ${i}${ext}`;
+    await fs.rename(src, path.join(trashDir, name));
+    return { from: rel, to: `.trash/${name}` };
+  }
+
+  /** Возвращает медиафайл из корзины на прежнее место. */
+  async restoreAsset(trashed: { from: string; to: string }): Promise<void> {
+    const name = path.posix.basename(trashed.to);
+    if (!trashed.to.startsWith('.trash/') || name !== trashed.to.slice(7) || !mediaKind(name)) throw new VaultError('Некорректный файл в корзине', 'invalid');
+    const dest = this.assetPath(trashed.from);
+    if (await exists(dest)) throw new VaultError('Файл с таким именем уже есть', 'conflict');
+    await fs.mkdir(path.dirname(dest), { recursive: true });
+    await fs.rename(path.join(this.root, '.trash', name), dest);
+  }
+
   /** Перемещает заметку в другую папку (например, в архив). Ссылки по имени продолжают работать. */
   async move(rel: string, toFolder: string): Promise<Note> {
     const src = this.safePath(rel);
@@ -876,6 +1001,19 @@ function stripEmpty<T extends object>(o: T): Partial<T> {
   const out: Partial<T> = {};
   for (const [k, v] of Object.entries(o)) if (v !== undefined && v !== null && v !== '') (out as Record<string, unknown>)[k] = v;
   return out;
+}
+
+const AUDIO_EXT = ['mp3', 'm4a', 'aac', 'wav', 'flac', 'ogg', 'oga', 'opus'];
+const VIDEO_EXT = ['mp4', 'm4v', 'mov', 'webm'];
+export const MEDIA_MIME: Record<string, string> = {
+  mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav', flac: 'audio/flac', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg',
+  mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
+};
+
+/** audio / video по расширению файла, иначе null. */
+export function mediaKind(file: string): 'audio' | 'video' | null {
+  const ext = path.posix.extname(file).slice(1).toLowerCase();
+  return AUDIO_EXT.includes(ext) ? 'audio' : VIDEO_EXT.includes(ext) ? 'video' : null;
 }
 
 async function exists(abs: string): Promise<boolean> {

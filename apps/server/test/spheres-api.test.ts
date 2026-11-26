@@ -30,6 +30,39 @@ async function send(method: 'POST' | 'PUT', url: string, payload: unknown, heade
   return { status: r.statusCode, body: r.json() };
 }
 
+describe('API: видео и аудио в обучении', () => {
+  it('загружает файл потоком, отдаёт его с перемоткой и не пускает чужие файлы', async () => {
+    const rel = 'Resources/Обучение/Книги/Inspired.md';
+    const up = await app.inject({
+      method: 'POST',
+      url: `/api/learning/media/upload?path=${encodeURIComponent(rel)}&name=${encodeURIComponent('урок.mp4')}`,
+      headers: { ...H, 'content-type': 'application/octet-stream' },
+      payload: Buffer.from('0123456789'),
+    });
+    expect(up.statusCode).toBe(200);
+    const item = up.json().items[0];
+    expect(item).toMatchObject({ kind: 'video', file: 'Resources/Вложения/урок.mp4' });
+    const noHeader = await app.inject({ method: 'POST', url: `/api/learning/media/upload?path=${encodeURIComponent(rel)}&name=x.mp3`, headers: { host: H.host, 'content-type': 'application/octet-stream' }, payload: Buffer.from('1') });
+    expect(noHeader.statusCode).toBe(403);
+
+    const full = await app.inject({ method: 'GET', url: `/api/media?path=${encodeURIComponent(item.file)}`, headers: { host: H.host } });
+    expect(full.statusCode).toBe(200);
+    expect(full.headers['content-type']).toBe('video/mp4');
+    expect(full.body).toBe('0123456789');
+    const part = await app.inject({ method: 'GET', url: `/api/media?path=${encodeURIComponent(item.file)}`, headers: { host: H.host, range: 'bytes=2-5' } });
+    expect(part.statusCode).toBe(206);
+    expect(part.headers['content-range']).toBe('bytes 2-5/10');
+    expect(part.body).toBe('2345');
+    expect((await app.inject({ method: 'GET', url: `/api/media?path=${encodeURIComponent(rel)}`, headers: { host: H.host } })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'GET', url: `/api/media?path=${encodeURIComponent('../secret.mp3')}`, headers: { host: H.host } })).statusCode).toBe(403);
+
+    const del = await send('POST', '/api/learning/media/delete', { path: rel, line: item.line, raw: item.raw });
+    expect(del.body.deleted.trashed.to).toBe('.trash/урок.mp4');
+    const back = await send('POST', '/api/learning/media/restore', del.body.deleted);
+    expect(back.body.items[0].file).toBe('Resources/Вложения/урок.mp4');
+  });
+});
+
 describe('API: правка и удаление строк', () => {
   it('операция: изменение, удаление и возврат; задача: текст, удаление и возврат', async () => {
     const add = await send('POST', '/api/finance/transactions', { kind: 'expense', amount: 1500, category: 'Продукты', description: 'Тест' });

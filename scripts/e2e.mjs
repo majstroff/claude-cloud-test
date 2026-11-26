@@ -425,6 +425,33 @@ try {
     if (!(await readVault(rel)).includes('> Лучшие команды любят проблему. (с. 45)')) throw new Error('Цитата не вернулась');
   });
 
+  await step('Обучение: аудиофайл прикрепляется, играет в плеере и удаляется с «Отменить»', async () => {
+    const rel = 'Resources/Обучение/Книги/Inspired.md';
+    // 0,5 секунды тишины в формате WAV.
+    const samples = 4000;
+    const wav = Buffer.alloc(44 + samples * 2);
+    wav.write('RIFF', 0); wav.writeUInt32LE(36 + samples * 2, 4); wav.write('WAVE', 8); wav.write('fmt ', 12);
+    wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(8000, 24);
+    wav.writeUInt32LE(16000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34); wav.write('data', 36); wav.writeUInt32LE(samples * 2, 40);
+    await page.goto(`${base}/item?path=${encodeURIComponent(rel)}`);
+    await page.getByLabel('Выбрать аудио или видео').setInputFiles({ name: 'Лекция E2E.wav', mimeType: 'audio/wav', buffer: wav });
+    await expectText('Прикреплено: Лекция E2E.wav');
+    const audio = page.getByLabel('Аудио: Лекция E2E');
+    await audio.waitFor();
+    const duration = await audio.evaluate((el) => new Promise((res) => (el.readyState >= 1 ? res(el.duration) : el.addEventListener('loadedmetadata', () => res(el.duration)))));
+    if (!(duration > 0.4 && duration < 0.6)) throw new Error(`Плеер не прочитал файл: ${duration}`);
+    await fs.access(path.join(vault, 'Resources/Вложения/Лекция E2E.wav'));
+    if (!(await readVault(rel)).includes('![[Лекция E2E.wav]]')) throw new Error('Ссылка на файл не записана в заметку');
+    await page.getByRole('button', { name: 'Удалить медиа: Лекция E2E' }).click();
+    await page.getByRole('button', { name: 'Да, удалить' }).click();
+    await expectText('Убрано: «Лекция E2E»');
+    await fs.access(path.join(vault, '.trash/Лекция E2E.wav'));
+    await page.getByRole('button', { name: 'Отменить' }).click();
+    await expectText('Возвращено');
+    await audio.waitFor();
+    await fs.access(path.join(vault, 'Resources/Вложения/Лекция E2E.wav'));
+  });
+
   await step('Практики: запись попадает в ежедневную заметку', async () => {
     await page.goto(`${base}/practices`);
     await page.getByLabel('Минут').fill('15');

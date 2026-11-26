@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { execFile } from 'node:child_process';
+import { createReadStream } from 'node:fs';
 import path from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
@@ -10,6 +11,7 @@ import {
   Life,
   Spheres,
   Vault,
+  MEDIA_MIME,
   VaultError,
   endOfMonth,
   isIsoDate,
@@ -287,6 +289,33 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
       s.favorites = s.favorites.map((f) => (f === rel ? n.path : f));
     });
     return { path: n.path };
+  });
+
+  // Медиафайлы хранилища (аудио, видео) с поддержкой перемотки (Range).
+  app.addContentTypeParser('application/octet-stream', (_req, payload, done) => done(null, payload));
+  app.get('/api/media', async (req, reply) => {
+    const rel = required(str(query(req).path), 'path');
+    const abs = vault.assetPath(rel);
+    let st: fs.Stats;
+    try {
+      st = await fs.promises.stat(abs);
+    } catch {
+      throw new HttpError(404, 'Файл не найден');
+    }
+    const ext = path.extname(abs).slice(1).toLowerCase();
+    reply.header('Accept-Ranges', 'bytes').header('Content-Type', MEDIA_MIME[ext] ?? 'application/octet-stream').header('Cache-Control', 'no-cache');
+    const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ''));
+    if (range && (range[1] || range[2])) {
+      let start = range[1] ? Number(range[1]) : st.size - Number(range[2]);
+      let end = range[1] && range[2] ? Number(range[2]) : st.size - 1;
+      start = Math.max(0, start);
+      end = Math.min(end, st.size - 1);
+      if (start > end) return reply.code(416).header('Content-Range', `bytes */${st.size}`).send();
+      reply.code(206).header('Content-Range', `bytes ${start}-${end}/${st.size}`).header('Content-Length', end - start + 1);
+      return reply.send(createReadStream(abs, { start, end }));
+    }
+    reply.header('Content-Length', st.size);
+    return reply.send(createReadStream(abs));
   });
 
   // Отдельные записи заметки (цитаты, журнал, история…): правка и удаление строк.

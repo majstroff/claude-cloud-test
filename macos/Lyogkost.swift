@@ -67,6 +67,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        if #available(macOS 12.3, *) { config.preferences.isElementFullscreenEnabled = true }
+        config.mediaTypesRequiringUserActionForPlayback = []
         webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = self
         webView.uiDelegate = self
@@ -132,6 +134,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { return decisionHandler(.cancel) }
+        // Встроенные плееры (YouTube, Rutube, Vimeo) грузятся во фреймах — их не трогаем.
+        if let frame = navigationAction.targetFrame, !frame.isMainFrame {
+            return decisionHandler(.allow)
+        }
         if isAppURL(url) {
             decisionHandler(.allow)
         } else {
