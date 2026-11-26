@@ -20,6 +20,11 @@ const FOLDER_LABELS: Array<[keyof FolderConfig, string]> = [
   ['contacts', 'Контакты'],
   ['companies', 'Компании'],
   ['documents', 'Документы'],
+  ['finance', 'Финансы'],
+  ['health', 'Спорт и здоровье'],
+  ['learning', 'Чтение и обучение'],
+  ['practices', 'Практики'],
+  ['home', 'Дом'],
 ];
 
 export function SettingsPage() {

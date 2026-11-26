@@ -5,6 +5,7 @@ import fastifyStatic from '@fastify/static';
 import {
   Crm,
   Life,
+  Spheres,
   Vault,
   VaultError,
   endOfMonth,
@@ -18,6 +19,7 @@ import {
 } from '@frame-os/vault';
 import { StateStore } from './state.ts';
 import { registerCrmRoutes } from './crm-routes.ts';
+import { registerSpheresRoutes } from './spheres-routes.ts';
 import { KNOWN_INTEGRATIONS, registerIntegrations, type IntegrationStatus } from './integrations.ts';
 
 export interface AppOptions {
@@ -53,16 +55,17 @@ const PRIORITIES: Priority[] = ['highest', 'high', 'medium', 'none', 'low', 'low
 const TASK_VIEWS: TaskView[] = ['today', 'overdue', 'upcoming', 'backlog', 'done', 'open', 'all'];
 const FOLDER_KEYS: Array<keyof FolderConfig> = [
   'projects', 'areas', 'resources', 'archive', 'goals', 'cycles', 'ideas', 'inbox', 'daily', 'events',
-  'work', 'contacts', 'companies', 'documents',
+  'work', 'contacts', 'companies', 'documents', 'finance', 'health', 'learning', 'practices', 'home',
 ];
 
-export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { vault: Vault; life: Life; crm: Crm }> {
+export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { vault: Vault; life: Life; crm: Crm; spheres: Spheres }> {
   const app = Fastify({ logger: opts.logger ?? false, bodyLimit: 6 * 1024 * 1024 });
   const state = new StateStore(opts.dataDir);
   const saved = await state.load();
   const vault = await Vault.open({ root: opts.vaultPath, clock: opts.clock, folders: saved.folders });
   const life = new Life(vault);
   const crm = new Crm(life);
+  const spheres = new Spheres(life);
   if (opts.watch) vault.watch();
   app.addHook('onClose', async () => vault.unwatch());
 
@@ -307,7 +310,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
   });
 
   // --- Главная, день, календарь ---
-  app.get('/api/dashboard', async () => ({ ...life.dashboard(), reminders: crm.reminders() }));
+  app.get('/api/dashboard', async () => ({ ...life.dashboard(), reminders: crm.reminders(), spheres: spheres.dashboard() }));
 
   app.get('/api/day', async (req) => {
     const date = str(query(req).date) ?? vault.today();
@@ -424,7 +427,8 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
     return { path: n.path, status };
   });
 
-  registerCrmRoutes(app, crm);
+  registerCrmRoutes(app, crm, spheres);
+  registerSpheresRoutes(app, spheres);
 
   app.all('/api/*', async (req, reply) => reply.code(404).send({ error: `Нет такого метода API: ${req.method} ${req.url.split('?')[0]}` }));
 
@@ -443,10 +447,11 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
     );
   }
 
-  const out = app as unknown as FastifyInstance & { vault: Vault; life: Life; crm: Crm };
+  const out = app as unknown as FastifyInstance & { vault: Vault; life: Life; crm: Crm; spheres: Spheres };
   out.vault = vault;
   out.life = life;
   out.crm = crm;
+  out.spheres = spheres;
   return out;
 }
 

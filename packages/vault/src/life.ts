@@ -495,6 +495,8 @@ export class Life {
         continue;
       }
       if (n.type === 'daily') continue;
+      // Пропущенные тренировки и отменённые события в календаре не показываем.
+      if (fm.status === 'skipped' || fm.status === 'cancelled') continue;
       if (isIsoDate(fm.date)) {
         push(fm.date, {
           kind: 'event',

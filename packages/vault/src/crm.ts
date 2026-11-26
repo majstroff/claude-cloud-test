@@ -13,6 +13,7 @@ import { addDays, diffDays, isIsoDate } from './dates.ts';
 import { appendToSection, getSectionText, setSectionText } from './markdown.ts';
 import { VaultError, type Note, type NoteSummary } from './vault.ts';
 import type { CalendarItem, Life, TaskDTO } from './life.ts';
+import { normalizeFieldValue, type Ref } from './entity-kit.ts';
 
 // ---------- Справочники ----------
 
@@ -140,11 +141,6 @@ const FIELD_LABEL: Record<string, string> = {
 
 // ---------- Типы данных ----------
 
-/** Ссылка на заметку или просто текст, если такой заметки нет. */
-export interface Ref {
-  path: string | null;
-  title: string;
-}
 
 export interface VacancyDTO {
   path: string;
@@ -248,6 +244,8 @@ type Related = Array<NoteSummary & { direction: 'out' | 'in' | 'both' }>;
 // ---------- Модуль ----------
 
 export class Crm {
+  readonly entityTypes: readonly string[] = ENTITY_TYPES;
+
   constructor(readonly life: Life) {
     life.addCalendarSource((from, to) => this.calendarItems(from, to));
   }
@@ -321,53 +319,7 @@ export class Crm {
   }
 
   private normalizeValue(kind: FieldKind, value: unknown, label: string): unknown {
-    if (typeof kind === 'object') {
-      if (typeof value !== 'string' || !kind.enum.includes(value)) throw new VaultError(`Недопустимое значение поля «${label}»`, 'invalid');
-      return value;
-    }
-    if (kind === 'boolean') {
-      if (typeof value !== 'boolean') throw new VaultError(`Поле «${label}» должно быть да/нет`, 'invalid');
-      return value;
-    }
-    if (kind === 'number') {
-      const n = typeof value === 'number' ? value : Number(String(value).replace(',', '.'));
-      if (!Number.isFinite(n) || n < 0 || n > 3650) throw new VaultError(`Поле «${label}»: введите число от 0 до 3650`, 'invalid');
-      return Math.round(n);
-    }
-    if (kind === 'list') {
-      const arr = Array.isArray(value) ? value : String(value).split(/[\n,]+/);
-      return arr.map((x) => String(x).trim()).filter(Boolean);
-    }
-    const s = String(value).trim();
-    switch (kind) {
-      case 'date':
-        if (!isIsoDate(s)) throw new VaultError(`Поле «${label}»: дата в формате ГГГГ-ММ-ДД`, 'invalid');
-        return s;
-      case 'time':
-        if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(s)) throw new VaultError(`Поле «${label}»: время в формате ЧЧ:ММ`, 'invalid');
-        return s;
-      case 'url':
-        if (!/^https?:\/\/\S+$/i.test(s)) throw new VaultError(`Поле «${label}»: ссылка должна начинаться с http:// или https://`, 'invalid');
-        return s;
-      case 'email':
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) throw new VaultError(`Поле «${label}»: неверный email`, 'invalid');
-        return s;
-      case 'phone':
-        if (!/^\+?[\d\s()\-]{5,20}$/.test(s)) throw new VaultError(`Поле «${label}»: неверный номер телефона`, 'invalid');
-        return s;
-      case 'last4':
-        if (!/^[0-9A-Za-zА-Яа-я]{1,4}$/.test(s)) throw new VaultError('Поле «Последние символы номера»: не больше 4 букв или цифр', 'invalid');
-        return s;
-      case 'docnumber':
-        if (!/^[0-9A-Za-zА-Яа-яЁё№\s\-/.]{1,40}$/.test(s)) {
-          throw new VaultError('Поле «Номер»: только буквы, цифры, пробелы, дефис, точка, «/» и «№», до 40 символов', 'invalid');
-        }
-        return s.replace(/\s+/g, ' ');
-      case 'link':
-        return this.linkOrText(s);
-      default:
-        return s.slice(0, 500);
-    }
+    return normalizeFieldValue(kind, value, label, (v) => this.linkOrText(v));
   }
 
   /** Ссылка [[…]], если заметка с таким путём или именем есть, иначе текст. */
