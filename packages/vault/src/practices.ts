@@ -17,6 +17,7 @@ import { nowTime, parseNumber } from './entity-kit.ts';
 import { appendToSection, getSectionText, setSectionText } from './markdown.ts';
 import { VaultError, type Vault } from './vault.ts';
 import type { Life } from './life.ts';
+import type { Routines } from './routines.ts';
 
 export const PRACTICE_KINDS = ['meditation', 'breathing', 'yoga', 'journaling', 'visualization', 'prayer', 'other'] as const;
 export type PracticeKind = (typeof PRACTICE_KINDS)[number];
@@ -232,7 +233,7 @@ export class Practices {
     };
   }
 
-  overview(routines: { list: (s: 'practice') => unknown[] }, days = 30) {
+  overview(routines: Routines, days = 30) {
     const today = this.today;
     const range = Array.from({ length: Math.max(1, Math.min(days, 366)) }, (_, i) => addDays(today, -i));
     const history = range.map((d) => this.day(d)).filter((d) => d.exists);

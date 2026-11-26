@@ -17,6 +17,7 @@ import { splitRow } from './finance.ts';
 import { appendToSection, findSection, getSectionText, setSectionText } from './markdown.ts';
 import { VaultError, type Note } from './vault.ts';
 import type { Life } from './life.ts';
+import type { Routines } from './routines.ts';
 
 export const WORKOUT_KINDS = ['strength', 'run', 'cardio', 'swim', 'bike', 'yoga', 'stretch', 'walk', 'other'] as const;
 export const WORKOUT_KIND_LABEL: Record<(typeof WORKOUT_KINDS)[number], string> = {
@@ -257,7 +258,7 @@ export class Health extends EntityModule {
     return this.dayHealth(date);
   }
 
-  overview(routines: { list: (s: 'health') => unknown[] }) {
+  overview(routines: Routines) {
     const today = this.today;
     const days = Array.from({ length: 14 }, (_, i) => addDays(today, i - 13)).map((d) => {
       const h = this.dayHealth(d);

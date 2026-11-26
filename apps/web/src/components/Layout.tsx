@@ -2,7 +2,12 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  BookOpen,
   Briefcase,
+  Dumbbell,
+  Flower2,
+  House,
+  Wallet,
   CalendarDays,
   FileLock2,
   Users,
@@ -33,6 +38,11 @@ const NAV = [
   { to: '/work', label: 'Работа', icon: Briefcase },
   { to: '/contacts', label: 'Контакты', icon: Users, badge: 'followups' as const },
   { to: '/documents', label: 'Документы', icon: FileLock2, badge: 'documents' as const },
+  { to: '/finance', label: 'Финансы', icon: Wallet, badge: 'payments' as const },
+  { to: '/health', label: 'Спорт и здоровье', icon: Dumbbell },
+  { to: '/learning', label: 'Чтение и обучение', icon: BookOpen },
+  { to: '/practices', label: 'Практики', icon: Flower2 },
+  { to: '/home', label: 'Дом', icon: House },
 ];
 
 const TITLES: Record<string, string> = {
@@ -50,6 +60,12 @@ const TITLES: Record<string, string> = {
   '/contacts/company': 'Компания',
   '/documents': 'Документы',
   '/documents/view': 'Документ',
+  '/finance': 'Финансы',
+  '/health': 'Спорт и здоровье',
+  '/learning': 'Чтение и обучение',
+  '/practices': 'Практики',
+  '/home': 'Дом',
+  '/item': 'Запись',
   '/note': 'Заметка',
   '/favorites': 'Избранное',
   '/settings': 'Настройки',
@@ -88,6 +104,7 @@ export function Layout() {
     ideas: dash.data?.ideasNew ?? 0,
     followups: dash.data?.reminders?.followUps.filter((c) => c.followUp !== 'soon').length ?? 0,
     documents: dash.data?.reminders?.documents.length ?? 0,
+    payments: dash.data?.spheres?.obligationsOverdue ?? 0,
   };
   const nextTheme = theme === 'system' ? 'dark' : theme === 'dark' ? 'light' : 'system';
 

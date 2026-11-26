@@ -163,10 +163,13 @@ describe('Регулярные дела', () => {
 
   it('создаётся в папке своей сферы и повторяется в календаре', async () => {
     const { sp, life } = await setup();
-    const n = await sp.routines.createEntity({ type: 'routine', title: 'Полить цветы', fields: { sphere: 'home', every: 3, start: '2026-11-25' } });
+    const n = await sp.routines.createEntity({ type: 'routine', title: 'Полить цветы', fields: { sphere: 'home', every: 7, start: '2026-11-25' } });
     expect(n.path).toBe('Areas/Дом/Регулярное/Полить цветы.md');
-    const dates = life.calendar('2026-11-24', '2026-12-04').filter((d) => d.items.some((i) => i.title === 'Полить цветы')).map((d) => d.date);
-    expect(dates).toEqual(['2026-11-25', '2026-11-28', '2026-12-01', '2026-12-04']);
+    const dates = life.calendar('2026-11-24', '2026-12-09').filter((d) => d.items.some((i) => i.title === 'Полить цветы')).map((d) => d.date);
+    expect(dates).toEqual(['2026-11-25', '2026-12-02', '2026-12-09']);
+    // Ежедневное дело — только ближайший раз, а не каждый день месяца.
+    const daily = life.calendar('2026-11-24', '2026-12-09').filter((d) => d.items.some((i) => i.title === 'Витамин D'));
+    expect(daily.map((d) => d.date)).toEqual(['2026-11-24']);
     await expect(sp.routines.createEntity({ type: 'routine', title: 'X', fields: { every: 0 } })).rejects.toThrow(/не меньше 1/);
   });
 });
@@ -222,7 +225,7 @@ describe('Спорт и здоровье', () => {
     expect(o.averages.sleep).toBe(7);
     expect(o.week.done).toBe(0); // неделя начинается с понедельника 23-го, выполненных пока нет
     expect(o.week.previousDone).toBe(2);
-    expect(o.routines.map((r) => (r as { title: string }).title)).toContain('Витамин D');
+    expect(o.routines.map((r) => r.title)).toContain('Витамин D');
   });
 });
 

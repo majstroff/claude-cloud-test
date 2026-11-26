@@ -430,7 +430,7 @@ export class Life {
       overdue,
       done: doneOnDay,
       dailyTasks: fromDaily.filter((t) => !planned.some((p) => p.id === t.id) && !doneOnDay.some((d) => d.id === t.id)),
-      events: this.calendar(date, date).flatMap((d) => d.items.filter((i) => i.kind !== 'task')),
+      events: this.calendar(date, date).flatMap((d) => d.items.filter((i) => i.kind !== 'task' && !(i.kind === 'event' && i.noteType === 'routine'))),
     };
   }
 
@@ -526,8 +526,10 @@ export class Life {
     const todayTasks = this.tasks('today');
     const overdue = this.tasks('overdue');
     const upcomingDays = this.calendar(addDays(today, 1), addDays(today, 14));
-    const events = upcomingDays.flatMap((d) => d.items.filter((i) => i.kind !== 'task').map((i) => ({ ...i, date: d.date })));
-    const todayEvents = this.calendar(today, today)[0]!.items.filter((i) => i.kind !== 'task');
+    // Регулярные дела показываются отдельной карточкой, в ленте событий они бы заслонили остальное.
+    const isEvent = (i: CalendarItem) => i.kind !== 'task' && !(i.kind === 'event' && i.noteType === 'routine');
+    const events = upcomingDays.flatMap((d) => d.items.filter(isEvent).map((i) => ({ ...i, date: d.date })));
+    const todayEvents = this.calendar(today, today)[0]!.items.filter(isEvent);
     const projects = this.projects().filter((p) => p.status === 'active');
     const cycles = this.cycles();
     const current = cycles.find((c) => c.state === 'current') ?? null;

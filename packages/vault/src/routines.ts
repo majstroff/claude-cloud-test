@@ -143,13 +143,17 @@ export class Routines extends EntityModule {
     return this.routine(this.vault.require(rel));
   }
 
-  /** Плановые даты в календаре: ближайшая и следующие по периоду. */
+  /**
+   * Плановые даты в календаре: ближайшая, а для дел реже раза в неделю — и следующие.
+   * Ежедневные дела не размножаются по всему месяцу, чтобы не заслонять события.
+   */
   calendarItems(from: string, to: string): Array<{ date: string; item: CalendarItem }> {
     const out: Array<{ date: string; item: CalendarItem }> = [];
     for (const r of this.list()) {
       if (!r.active) continue;
       let d = r.next < this.today ? this.today : r.next;
-      for (let i = 0; i < 400 && d <= to; i++, d = addDays(d, r.every)) {
+      const repeats = r.every >= 7 ? 400 : 1;
+      for (let i = 0; i < repeats && d <= to; i++, d = addDays(d, r.every)) {
         if (d >= from) out.push({ date: d, item: { kind: 'event', title: r.title, path: r.path, noteType: 'routine', time: r.time, amount: null } });
       }
     }
