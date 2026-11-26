@@ -30,6 +30,30 @@ async function send(method: 'POST' | 'PUT', url: string, payload: unknown, heade
   return { status: r.statusCode, body: r.json() };
 }
 
+describe('API: правка и удаление строк', () => {
+  it('операция: изменение, удаление и возврат; задача: текст, удаление и возврат', async () => {
+    const add = await send('POST', '/api/finance/transactions', { kind: 'expense', amount: 1500, category: 'Продукты', description: 'Тест' });
+    const tx = add.body.transaction;
+    expect((await send('PUT', '/api/finance/transactions', { ...tx, amount: 900, link: '' }, { host: H.host })).status).toBe(403);
+    const upd = await send('PUT', '/api/finance/transactions', { path: tx.path, line: tx.line, raw: tx.raw, kind: 'expense', amount: 900, category: 'Кафе', description: 'Тест', date: tx.date });
+    expect(upd.status).toBe(200);
+    expect(upd.body.transaction).toMatchObject({ amount: 900, category: 'Кафе' });
+    expect((await send('POST', '/api/finance/transactions/delete', { path: tx.path, line: tx.line })).status).toBe(400);
+    const del = await send('POST', '/api/finance/transactions/delete', { path: tx.path, line: upd.body.transaction.line, raw: upd.body.transaction.raw });
+    expect(del.body.deleted).toMatchObject({ amount: 900, description: 'Тест' });
+
+    const t = (await send('POST', '/api/tasks', { text: 'Проверить API' })).body.task;
+    const r = await app.inject({ method: 'PATCH', url: '/api/tasks', headers: H, payload: { path: t.path, line: t.line, raw: t.raw, action: 'rename', text: 'Проверить API ещё раз' } });
+    const renamed = r.json().task;
+    expect(renamed.title).toBe('Проверить API ещё раз');
+    const gone = await send('POST', '/api/tasks/delete', { path: renamed.path, line: renamed.line, raw: renamed.raw });
+    expect(gone.status).toBe(200);
+    const back = await send('POST', '/api/tasks/restore', gone.body.deleted);
+    expect(back.body.task.title).toBe('Проверить API ещё раз');
+    expect((await send('POST', '/api/tasks/restore', { path: t.path, line: 0, raw: 'не задача' })).status).toBe(400);
+  });
+});
+
 describe('API: финансы', () => {
   it('сводка, операция, оплата подписки и бюджет', async () => {
     const f = await get('/api/finance?month=2026-11');

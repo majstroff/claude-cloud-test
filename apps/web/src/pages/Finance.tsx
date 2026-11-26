@@ -1,12 +1,13 @@
+import { DeleteNoteButton } from '../components/DeleteNote.tsx';
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, FileText, PiggyBank, Plus, Save, ShieldCheck, Trash2 } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight, FileText, Pencil, PiggyBank, Plus, Save, ShieldCheck, Trash2 } from 'lucide-react';
 import { api, type DebtDTO, type FinanceData, type SavingsDTO } from '../api.ts';
 import { CreateEntityModal } from '../components/Entities.tsx';
 import { Modal } from '../components/Layout.tsx';
 import { Money, ObligationList, useAct } from '../components/Spheres.tsx';
-import { Empty, ErrorBox, Loading, MONTHS, Progress, fmtDate, noteHref, relDate } from '../components/ui.tsx';
+import { Empty, ErrorBox, Loading, MONTHS, Progress, fmtDate, noteHref, relDate, useToast } from '../components/ui.tsx';
 import {
   DEBT_DIRECTION_LABEL,
   DEBT_FIELDS,
@@ -319,29 +320,19 @@ function Operations({ d }: { d: FinanceData }) {
                   <th>Описание</th>
                   <th>Связь</th>
                   <th className="r">Сумма</th>
+                  <th className="r" aria-label="Действия" />
                 </tr>
               </thead>
               <tbody>
                 {list.map((t) => (
-                  <tr key={`${t.path}:${t.line}`}>
-                    <td className="small">{fmtDate(t.date)}</td>
-                    <td>
-                      {t.category}
-                      {t.kind === 'saving' && <span className="chip" style={{ marginLeft: 6 }}>накопления</span>}
-                    </td>
-                    <td>{t.description}</td>
-                    <td className="small">{t.link ? t.link.path ? <Link to={entityHref(typeOfLink(t.link.path, d), t.link.path)}>{t.link.title}</Link> : t.link.title : ''}</td>
-                    <td className="r">
-                      <Money value={t.amount} sign={t.kind === 'income' ? 'plus' : 'minus'} />
-                    </td>
-                  </tr>
+                  <TxRow key={`${t.path}:${t.line}:${t.raw}`} t={t} d={d} />
                 ))}
               </tbody>
             </table>
           </div>
         )}
         <div className="small muted" style={{ marginTop: 10 }}>
-          Исправить или удалить операцию можно в заметке месяца:{' '}
+          Изменить или удалить операцию — кнопками справа в строке. Таблица хранится в заметке месяца:{' '}
           {[...new Set(list.map((t) => t.path))].map((p) => (
             <Link key={p} to={noteHref(p)} style={{ marginRight: 8 }}>
               {p}
@@ -350,6 +341,143 @@ function Operations({ d }: { d: FinanceData }) {
         </div>
       </section>
     </div>
+  );
+}
+
+type Tx = FinanceData['transactions'][number];
+
+function txBody(t: Pick<Tx, 'kind' | 'amount' | 'category' | 'description' | 'date' | 'link'>) {
+  return { kind: t.kind, amount: t.amount, category: t.category, description: t.description, date: t.date, link: t.link?.path ?? t.link?.title ?? '' };
+}
+
+/** Строка операции: просмотр, правка на месте и удаление с «Отменить». */
+function TxRow({ t, d }: { t: Tx; d: FinanceData }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [mode, setMode] = useState<'view' | 'edit' | 'confirm'>('view');
+  const [f, setF] = useState(() => ({ ...txBody(t), amount: String(t.amount), link: t.link?.title ?? '' }));
+  const ref = { path: t.path, line: t.line, raw: t.raw };
+  const save = useMutation({
+    mutationFn: () => api.put('/api/finance/transactions', { ...ref, ...f }),
+    onSuccess: () => {
+      toast('Операция изменена');
+      setMode('view');
+      void qc.invalidateQueries();
+    },
+    onError: (e: Error) => toast(e.message, 'error'),
+  });
+  const del = useMutation({
+    mutationFn: () => api.post<{ deleted: Tx }>('/api/finance/transactions/delete', ref),
+    onSuccess: ({ deleted }) => {
+      void qc.invalidateQueries();
+      toast(
+        <span className="row" style={{ gap: 10, flexWrap: 'nowrap' }}>
+          <span>Операция удалена: {deleted.description || deleted.category}, {rub(deleted.amount)}</span>
+          <button
+            className="btn small"
+            onClick={() =>
+              void api
+                .post('/api/finance/transactions', txBody(deleted))
+                .then(() => toast('Операция возвращена'))
+                .catch((e: Error) => toast(e.message, 'error'))
+                .finally(() => void qc.invalidateQueries())
+            }
+          >
+            Отменить
+          </button>
+        </span>,
+        'info',
+        8000,
+      );
+    },
+    onError: (e: Error) => {
+      toast(e.message, 'error');
+      setMode('view');
+    },
+  });
+  const label = t.description || t.category;
+
+  if (mode === 'edit') {
+    const cats = f.kind === 'income' ? d.incomeCategories : d.expenseCategories;
+    return (
+      <tr>
+        <td colSpan={6}>
+          <form
+            className="stack"
+            style={{ gap: 8, padding: '4px 0' }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              save.mutate();
+            }}
+          >
+            <div className="inline-form">
+              <select className="select" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as Tx['kind'] })} aria-label="Тип операции">
+                {Object.entries(TX_KIND_LABEL).map(([k, l]) => (
+                  <option key={k} value={k}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+              <input className="input" style={{ width: 120 }} inputMode="decimal" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} aria-label="Сумма" required />
+              <input className="input" style={{ width: 150 }} list="fin-cats-edit" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} aria-label="Категория" />
+              <datalist id="fin-cats-edit">
+                {cats.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+              <input className="input" type="date" style={{ width: 150 }} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} aria-label="Дата операции" />
+            </div>
+            <div className="inline-form">
+              <input className="input grow" placeholder="Описание" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} aria-label="Описание" />
+              <input className="input grow" placeholder="Связь: проект, контакт…" value={f.link} onChange={(e) => setF({ ...f, link: e.target.value })} aria-label="Связь" />
+              <button className="btn primary small" type="submit" disabled={save.isPending || !f.amount.trim()}>
+                <Save size={14} /> Сохранить
+              </button>
+              <button className="btn small ghost" type="button" onClick={() => setMode('view')}>
+                Отмена
+              </button>
+            </div>
+          </form>
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr>
+      <td className="small">{fmtDate(t.date)}</td>
+      <td>
+        {t.category}
+        {t.kind === 'saving' && <span className="chip" style={{ marginLeft: 6 }}>накопления</span>}
+      </td>
+      <td>{t.description}</td>
+      <td className="small">{t.link ? t.link.path ? <Link to={entityHref(typeOfLink(t.link.path, d), t.link.path)}>{t.link.title}</Link> : t.link.title : ''}</td>
+      <td className="r">
+        <Money value={t.amount} sign={t.kind === 'income' ? 'plus' : 'minus'} />
+      </td>
+      <td className="r" style={{ whiteSpace: 'nowrap', width: 1 }}>
+        {mode === 'confirm' ? (
+          <span className="row" style={{ gap: 6, flexWrap: 'nowrap', justifyContent: 'flex-end' }}>
+            <span className="small muted">Удалить?</span>
+            <button className="btn small danger" disabled={del.isPending} onClick={() => del.mutate()}>
+              Да, удалить
+            </button>
+            <button className="btn small ghost" onClick={() => setMode('view')}>
+              Нет
+            </button>
+          </span>
+        ) : (
+          <span className="row" style={{ gap: 2, flexWrap: 'nowrap', justifyContent: 'flex-end' }}>
+            <button className="btn small ghost icon" title="Изменить" aria-label={`Изменить операцию: ${label}`} onClick={() => setMode('edit')}>
+              <Pencil size={15} />
+            </button>
+            <button className="btn small ghost icon" title="Удалить" aria-label={`Удалить операцию: ${label}`} onClick={() => setMode('confirm')}>
+              <Trash2 size={15} />
+            </button>
+          </span>
+        )}
+      </td>
+    </tr>
   );
 }
 
@@ -397,6 +525,7 @@ function Regular({ d, onCreate }: { d: FinanceData; onCreate: (t: Creating) => v
                       Оплачено
                     </button>
                   )}
+                  <DeleteNoteButton path={s.path} title={s.title} after={null} iconOnly />
                 </div>
               </li>
             ))}
@@ -433,6 +562,7 @@ function Regular({ d, onCreate }: { d: FinanceData; onCreate: (t: Creating) => v
                       Оплачено
                     </button>
                   )}
+                  <DeleteNoteButton path={p.path} title={p.title} after={null} iconOnly />
                 </div>
               </li>
             ))}
@@ -485,6 +615,7 @@ function DebtsAndSavings({ d, onCreate }: { d: FinanceData; onCreate: (t: Creati
                     <strong>{x.title}</strong>
                   </Link>
                   <span className={`chip ${x.status === 'closed' ? 'green' : x.overdue ? 'red' : ''}`}>{x.status === 'closed' ? 'Закрыт' : DEBT_DIRECTION_LABEL[x.direction]}</span>
+                  <DeleteNoteButton path={x.path} title={x.title} after={null} iconOnly />
                 </div>
                 <Progress value={x.paidPercent} tone="green" />
                 <div className="small muted">
@@ -527,6 +658,7 @@ function DebtsAndSavings({ d, onCreate }: { d: FinanceData; onCreate: (t: Creati
                     <strong>{s.title}</strong>
                   </Link>
                   <span className="chip">{SAVINGS_KIND_LABEL[s.kind]}</span>
+                  <DeleteNoteButton path={s.path} title={s.title} after={null} iconOnly />
                 </div>
                 <Progress value={s.progress} tone="green" />
                 <div className="small muted">

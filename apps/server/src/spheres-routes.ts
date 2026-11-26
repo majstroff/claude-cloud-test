@@ -36,6 +36,27 @@ export function registerSpheresRoutes(app: FastifyInstance, s: Spheres): void {
       }),
     };
   });
+  const txInput = (b: Record<string, unknown>) => {
+    const kind = text(b.kind) as TxKind | null;
+    if (!kind || !TX_KINDS.includes(kind)) throw new VaultError('Тип операции: доход, расход или накопления', 'invalid');
+    return { date: text(b.date), kind, amount: amount(b.amount), category: text(b.category), description: text(b.description), link: text(b.link) };
+  };
+  const txRef = (b: Record<string, unknown>) => {
+    const line = Number(b.line);
+    const raw = typeof b.raw === 'string' ? b.raw : '';
+    if (!Number.isInteger(line) || line < 0 || !raw) throw new VaultError('Не указана строка операции', 'invalid');
+    return { rel: path({ path: b.path }), line, raw };
+  };
+  app.put('/api/finance/transactions', async (req) => {
+    const b = body(req);
+    const r = txRef(b);
+    return { transaction: await s.finance.updateTransaction(r.rel, r.line, r.raw, txInput(b)) };
+  });
+  app.post('/api/finance/transactions/delete', async (req) => {
+    const b = body(req);
+    const r = txRef(b);
+    return { deleted: await s.finance.deleteTransaction(r.rel, r.line, r.raw) };
+  });
   app.put('/api/finance/budget', async (req) => {
     const b = body(req);
     if (!Array.isArray(b.limits)) throw new VaultError('Нет списка лимитов', 'invalid');

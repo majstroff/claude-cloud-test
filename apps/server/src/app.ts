@@ -347,7 +347,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
   app.patch('/api/tasks', async (req) => {
     const b = obj(req.body);
     const action = str(b.action);
-    if (!['complete', 'reopen', 'setDue', 'setPriority'].includes(action ?? '')) throw new HttpError(400, 'Неизвестное действие');
+    if (!['complete', 'reopen', 'setDue', 'setPriority', 'rename'].includes(action ?? '')) throw new HttpError(400, 'Неизвестное действие');
     if (typeof b.line !== 'number' || typeof b.raw !== 'string') throw new HttpError(400, 'Нужны line и raw задачи');
     const task = await life.updateTask({
       path: required(str(b.path), 'path'),
@@ -356,9 +356,17 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
       action: action as 'complete',
       due: b.due === null ? null : str(b.due),
       priority: priority(b.priority),
+      text: typeof b.text === 'string' ? b.text : undefined,
     });
     return { task };
   });
+
+  const taskRef = (b: Record<string, unknown>) => {
+    if (typeof b.line !== 'number' || typeof b.raw !== 'string') throw new HttpError(400, 'Нужны line и raw задачи');
+    return { path: required(str(b.path), 'path'), line: b.line, raw: b.raw };
+  };
+  app.post('/api/tasks/delete', async (req) => ({ deleted: await life.deleteTask(taskRef(obj(req.body))) }));
+  app.post('/api/tasks/restore', async (req) => ({ task: await life.restoreTask(taskRef(obj(req.body))) }));
 
   // --- Главная, день, календарь ---
   app.get('/api/dashboard', async () => ({ ...life.dashboard(), reminders: crm.reminders(), spheres: spheres.dashboard(), journal: { streak: journal.streak(), writtenToday: !!journal.summary(vault.today(), 0)?.written } }));

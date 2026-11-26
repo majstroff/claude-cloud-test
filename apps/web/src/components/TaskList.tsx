@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Calendar, Check, Flag, FileText, Repeat, X } from 'lucide-react';
+import { Calendar, Check, Flag, FileText, Pencil, Repeat, Trash2, X } from 'lucide-react';
 import { api, type Priority, type TaskDTO } from '../api.ts';
 import { addDaysIso, noteHref, relDate, useToast } from './ui.tsx';
 
@@ -9,7 +9,8 @@ type Action =
   | { action: 'complete' }
   | { action: 'reopen' }
   | { action: 'setDue'; due: string | null }
-  | { action: 'setPriority'; priority: Priority };
+  | { action: 'setPriority'; priority: Priority }
+  | { action: 'rename'; text: string };
 
 export function useTaskAction() {
   const qc = useQueryClient();
@@ -87,9 +88,46 @@ const PRIO_LABEL: Record<Priority, string> = {
   lowest: 'Самый низкий',
 };
 
+/** Удаление задачи с подтверждением и «Отменить» в уведомлении. */
+function useDeleteTask() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  return useMutation({
+    mutationFn: (task: TaskDTO) => api.post<{ deleted: { path: string; line: number; raw: string } }>('/api/tasks/delete', { path: task.path, line: task.line, raw: task.raw }),
+    onSuccess: ({ deleted }, task) => {
+      void qc.invalidateQueries();
+      toast(
+        <span className="row" style={{ gap: 10, flexWrap: 'nowrap' }}>
+          <span>Задача удалена: «{task.title.length > 40 ? task.title.slice(0, 40) + '…' : task.title}»</span>
+          <button
+            className="btn small"
+            onClick={() =>
+              void api
+                .post('/api/tasks/restore', deleted)
+                .then(() => toast('Задача возвращена'))
+                .catch((e: Error) => toast(e.message, 'error'))
+                .finally(() => void qc.invalidateQueries())
+            }
+          >
+            Отменить
+          </button>
+        </span>,
+        'info',
+        8000,
+      );
+    },
+    onError: (e: Error) => {
+      toast(e.message, 'error');
+      void qc.invalidateQueries();
+    },
+  });
+}
+
 export function TaskItem({ task, today, showSource = true, extra }: { task: TaskDTO; today: string; showSource?: boolean; extra?: (t: TaskDTO) => ReactNode }) {
   const m = useTaskAction();
-  const [menu, setMenu] = useState<null | 'date' | 'prio'>(null);
+  const del = useDeleteTask();
+  const [menu, setMenu] = useState<null | 'date' | 'prio' | 'edit' | 'delete'>(null);
+  const [draft, setDraft] = useState(task.title);
   const [customDate, setCustomDate] = useState(task.due ?? '');
   const done = task.status === 'done';
   const overdue = !done && task.date !== null && task.date < today;
@@ -98,7 +136,7 @@ export function TaskItem({ task, today, showSource = true, extra }: { task: Task
     m.mutate({ task, change });
   };
   return (
-    <li className={`task ${done ? 'done' : ''} ${m.isPending ? 'busy' : ''}`}>
+    <li className={`task ${done ? 'done' : ''} ${m.isPending || del.isPending ? 'busy' : ''}`}>
       <button
         className={`check p-${task.priority}`}
         aria-label={done ? 'Вернуть в работу' : 'Отметить выполненной'}
@@ -108,7 +146,46 @@ export function TaskItem({ task, today, showSource = true, extra }: { task: Task
         <Check size={12} strokeWidth={3} />
       </button>
       <div className="t-body">
-        <div className="t-title">{task.title || <span className="muted">(без текста)</span>}</div>
+        {menu === 'edit' ? (
+          <form
+            className="row"
+            style={{ gap: 6, flexWrap: 'nowrap' }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (draft.trim() && draft.trim() !== task.title) run({ action: 'rename', text: draft });
+              else setMenu(null);
+            }}
+          >
+            <input
+              className="input"
+              style={{ flex: 1, height: 32 }}
+              value={draft}
+              autoFocus
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => e.key === 'Escape' && setMenu(null)}
+              aria-label="Текст задачи"
+            />
+            <button className="btn small primary" type="submit" disabled={!draft.trim()}>
+              Сохранить
+            </button>
+            <button className="btn small ghost" type="button" onClick={() => setMenu(null)}>
+              Отмена
+            </button>
+          </form>
+        ) : (
+          <div className="t-title">{task.title || <span className="muted">(без текста)</span>}</div>
+        )}
+        {menu === 'delete' && (
+          <div className="row" style={{ marginTop: 8 }}>
+            <span className="small muted">Удалить задачу из заметки?</span>
+            <button className="btn small danger" disabled={del.isPending} onClick={() => del.mutate(task)}>
+              Да, удалить
+            </button>
+            <button className="btn small ghost" onClick={() => setMenu(null)}>
+              Нет
+            </button>
+          </div>
+        )}
         <div className="t-meta">
           {task.date && (
             <span className={`chip ${overdue ? 'red' : task.date === today ? 'blue' : ''}`}>
@@ -171,8 +248,26 @@ export function TaskItem({ task, today, showSource = true, extra }: { task: Task
         )}
       </div>
       {!done && extra && <div className="t-side">{extra(task)}</div>}
+      {done && (
+        <div className="t-actions">
+          <button className="btn small icon ghost" title="Удалить" aria-label={`Удалить задачу: ${task.title}`} onClick={() => setMenu(menu === 'delete' ? null : 'delete')}>
+            {menu === 'delete' ? <X size={14} /> : <Trash2 size={14} />}
+          </button>
+        </div>
+      )}
       {!done && (
         <div className="t-actions">
+          <button
+            className="btn small icon ghost"
+            title="Изменить текст"
+            aria-label={`Изменить задачу: ${task.title}`}
+            onClick={() => {
+              setDraft(task.title);
+              setMenu(menu === 'edit' ? null : 'edit');
+            }}
+          >
+            {menu === 'edit' ? <X size={14} /> : <Pencil size={14} />}
+          </button>
           <button className="btn small icon ghost" title="Срок" aria-label="Изменить срок" onClick={() => setMenu(menu === 'date' ? null : 'date')}>
             {menu === 'date' ? <X size={14} /> : <Calendar size={14} />}
           </button>
@@ -182,6 +277,9 @@ export function TaskItem({ task, today, showSource = true, extra }: { task: Task
           <Link className="btn small icon ghost" title="Открыть заметку" aria-label="Открыть заметку" to={noteHref(task.path)}>
             <FileText size={14} />
           </Link>
+          <button className="btn small icon ghost" title="Удалить" aria-label={`Удалить задачу: ${task.title}`} onClick={() => setMenu(menu === 'delete' ? null : 'delete')}>
+            {menu === 'delete' ? <X size={14} /> : <Trash2 size={14} />}
+          </button>
         </div>
       )}
     </li>

@@ -1,3 +1,4 @@
+import { DeleteNoteButton } from '../components/DeleteNote.tsx';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -34,6 +35,7 @@ export function WorkoutLine({ w, today }: { w: WorkoutDTO; today: string }) {
         </div>
       </Link>
       <span className={`chip ${w.status === 'done' ? 'green' : w.missed ? 'red' : ''}`}>{w.missed ? 'не отмечена' : WORKOUT_STATUS_LABEL[w.status]}</span>
+      <DeleteNoteButton path={w.path} title={w.title} after={null} iconOnly />
       {w.status === 'planned' && (!w.date || w.date <= today) && (
         <>
           <button className="btn small" onClick={() => status.mutate({ path: w.path, status: 'done' })} disabled={status.isPending} aria-label={`Выполнено: ${w.title}`}>

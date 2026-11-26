@@ -63,6 +63,27 @@ describe('Финансы', () => {
     await expect(sp.finance.addTransaction({ kind: 'expense', amount: 0 })).rejects.toThrow(/больше нуля/);
   });
 
+  it('изменяет и удаляет операцию; при смене месяца переносит её', async () => {
+    const { sp, dir } = await setup();
+    const tx = await sp.finance.addTransaction({ kind: 'expense', amount: 1500, category: 'Продукты', description: 'Тестовая покупка' });
+    const edited = await sp.finance.updateTransaction(tx.path, tx.line, tx.raw, { kind: 'expense', amount: '1700', category: 'Кафе', description: 'Обед', date: '2026-11-20' });
+    expect(edited).toMatchObject({ amount: 1700, category: 'Кафе', description: 'Обед', date: '2026-11-20', line: tx.line });
+    let file = await read(dir, 'Areas/Финансы/Операции/2026-11.md');
+    expect(file).toContain('| 2026-11-20 | Расход | 1700 | Кафе | Обед |');
+    expect(file).not.toContain('Тестовая покупка');
+    await expect(sp.finance.updateTransaction(tx.path, tx.line, tx.raw, { kind: 'expense', amount: 1 })).rejects.toMatchObject({ code: 'conflict' });
+
+    const moved = await sp.finance.updateTransaction(edited.path, edited.line, edited.raw, { kind: 'expense', amount: 1700, category: 'Кафе', description: 'Обед', date: '2026-12-01' });
+    expect(moved.path).toBe('Areas/Финансы/Операции/2026-12.md');
+    expect(await read(dir, 'Areas/Финансы/Операции/2026-11.md')).not.toContain('Обед');
+
+    const del = await sp.finance.deleteTransaction(moved.path, moved.line, moved.raw);
+    expect(del).toMatchObject({ amount: 1700, description: 'Обед' });
+    file = await read(dir, 'Areas/Финансы/Операции/2026-12.md');
+    expect(file).not.toContain('Обед');
+    await expect(sp.finance.deleteTransaction('Projects/Ремонт балкона.md', 0, 'x')).rejects.toMatchObject({ code: 'not_found' });
+  });
+
   it('оплата подписки переносит дату списания и пишет расход', async () => {
     const { sp, vault } = await setup();
     const rel = 'Areas/Финансы/Подписки/Яндекс Плюс.md';

@@ -212,6 +212,27 @@ try {
     if (!/- \[ \] Получить три сметы/.test(raw)) throw new Error('Задача не вернулась в работу');
   });
 
+  await step('Задачу можно переименовать, удалить и вернуть «Отменить»', async () => {
+    await page.goto(`${base}/backlog`);
+    const file = path.join(vault, 'Projects', 'Ремонт балкона.md');
+    const item = page.locator('li.task', { hasText: 'Получить три сметы' }).first();
+    await item.hover();
+    await item.getByRole('button', { name: 'Изменить задачу: Получить три сметы' }).click();
+    await page.getByLabel('Текст задачи').fill('Получить четыре сметы');
+    await page.getByRole('button', { name: 'Сохранить', exact: true }).click();
+    const renamed = page.locator('li.task', { hasText: 'Получить четыре сметы' }).first();
+    await renamed.waitFor();
+    if (!/- \[ \] Получить четыре сметы/.test(await fs.readFile(file, 'utf8'))) throw new Error('Текст задачи не изменён в файле');
+    await renamed.hover();
+    await renamed.getByRole('button', { name: 'Удалить задачу: Получить четыре сметы' }).click();
+    await renamed.getByRole('button', { name: 'Да, удалить' }).click();
+    await expectText('Задача удалена');
+    if ((await fs.readFile(file, 'utf8')).includes('Получить четыре сметы')) throw new Error('Задача не удалена');
+    await page.getByRole('button', { name: 'Отменить' }).click();
+    await expectText('Задача возвращена');
+    if (!(await fs.readFile(file, 'utf8')).includes('- [ ] Получить четыре сметы')) throw new Error('Задача не вернулась');
+  });
+
   await step('Работа: вакансия проходит по воронке, собеседование попадает в файл и календарь', async () => {
     await page.goto(`${base}/work`);
     await expectText('Product Manager — Acme');
@@ -323,6 +344,25 @@ try {
     const raw = await readVault(`Areas/Финансы/Операции/${month}.md`);
     if (!/\| Продукты \| E2E покупка \|/.test(raw)) throw new Error('Операция не записана');
     await shot('finance');
+  });
+
+  await step('Финансы: операцию можно изменить, удалить и вернуть «Отменить»', async () => {
+    const month = (await todayDate()).slice(0, 7);
+    const file = `Areas/Финансы/Операции/${month}.md`;
+    await page.getByRole('button', { name: 'Изменить операцию: E2E покупка' }).click();
+    const row = page.locator('tr', { has: page.getByRole('button', { name: 'Сохранить' }) });
+    await row.getByLabel('Сумма', { exact: true }).fill('2000');
+    await row.getByLabel('Описание', { exact: true }).fill('E2E покупка исправлена');
+    await row.getByRole('button', { name: 'Сохранить' }).click();
+    await expectText('Операция изменена');
+    if (!/\| 2000 \| Продукты \| E2E покупка исправлена \|/.test(await readVault(file))) throw new Error('Операция не изменена в файле');
+    await page.getByRole('button', { name: 'Удалить операцию: E2E покупка исправлена' }).click();
+    await page.getByRole('button', { name: 'Да, удалить' }).click();
+    await expectText('Операция удалена');
+    if ((await readVault(file)).includes('E2E покупка исправлена')) throw new Error('Операция не удалена из файла');
+    await page.getByRole('button', { name: 'Отменить' }).click();
+    await expectText('Операция возвращена');
+    if (!(await readVault(file)).includes('E2E покупка исправлена')) throw new Error('Операция не вернулась');
   });
 
   await step('Финансы: оплата подписки переносит дату следующего платежа', async () => {

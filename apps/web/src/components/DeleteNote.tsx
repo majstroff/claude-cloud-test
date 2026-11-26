@@ -10,7 +10,7 @@ import { useToast } from './ui.tsx';
  * (папка `.trash` в хранилище), откуда его можно вернуть.
  * after: куда перейти после удаления (по умолчанию — назад); null — остаться.
  */
-export function DeleteNoteButton({ path, title, after, small = true }: { path: string; title?: string; after?: string | null; small?: boolean }) {
+export function DeleteNoteButton({ path, title, after, small = true, iconOnly = false }: { path: string; title?: string; after?: string | null; small?: boolean; iconOnly?: boolean }) {
   const [confirm, setConfirm] = useState(false);
   const qc = useQueryClient();
   const toast = useToast();
@@ -31,7 +31,7 @@ export function DeleteNoteButton({ path, title, after, small = true }: { path: s
     return (
       <span className="row" style={{ gap: 6 }}>
         <span className="small muted">Удалить{title ? ` «${title}»` : ''}?</span>
-        <button className="btn small primary" style={{ background: 'var(--red)', borderColor: 'var(--red)' }} disabled={m.isPending} onClick={() => m.mutate()}>
+        <button className="btn small danger" disabled={m.isPending} onClick={() => m.mutate()}>
           Да, удалить
         </button>
         <button className="btn small ghost" onClick={() => setConfirm(false)}>
@@ -41,8 +41,9 @@ export function DeleteNoteButton({ path, title, after, small = true }: { path: s
     );
   }
   return (
-    <button className={`btn ${small ? 'small' : ''} ghost`} onClick={() => setConfirm(true)} aria-label={title ? `Удалить: ${title}` : 'Удалить заметку'} title="Удалить (в корзину Obsidian)">
-      <Trash2 size={14} /> Удалить
+    <button className={`btn ${small ? 'small' : ''} ghost ${iconOnly ? 'icon' : ''}`} onClick={() => setConfirm(true)} aria-label={title ? `Удалить: ${title}` : 'Удалить заметку'} title="Удалить (в корзину Obsidian)">
+      <Trash2 size={14} />
+      {!iconOnly && ' Удалить'}
     </button>
   );
 }

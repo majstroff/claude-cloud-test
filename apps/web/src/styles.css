@@ -155,7 +155,9 @@ button { cursor: pointer; }
 .btn.ghost:hover { background: var(--surface-2); }
 .btn.small { height: 30px; padding: 0 11px; font-size: 13px; border-radius: 8px; }
 .btn.icon { width: 36px; padding: 0; justify-content: center; }
-.btn.small.icon { width: 28px; }
+.btn.small.icon { width: 30px; }
+.btn.danger { background: var(--red); color: #fff; border-color: var(--red); }
+.btn.danger:hover { opacity: 0.88; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .input, .textarea, .select {
@@ -233,6 +235,12 @@ label.field { display: grid; gap: 6px; font-size: 13px; color: var(--text-2); }
 .task:hover .t-actions, .task:focus-within .t-actions { opacity: 1; }
 .task.busy { opacity: 0.5; pointer-events: none; }
 .task .t-side { flex: 0 0 auto; align-self: center; }
+/* На телефоне кнопки строки задачи не занимают место: появляются поверх строки при касании. */
+@media (max-width: 640px) {
+  .task { position: relative; }
+  .task .t-actions { display: none; position: absolute; right: 6px; top: 4px; background: var(--surface); border-radius: 10px; box-shadow: var(--shadow); padding: 2px; }
+  .task:hover .t-actions, .task:focus-within .t-actions { display: flex; }
+}
 @media (max-width: 640px) { .task .t-side .lbl { display: none; } .task .t-side .btn.small { width: 28px; padding: 0; justify-content: center; } }
 .spin { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
