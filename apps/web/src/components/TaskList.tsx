@@ -17,7 +17,35 @@ export function useTaskAction() {
   return useMutation({
     mutationFn: ({ task, change }: { task: TaskDTO; change: Action }) =>
       api.patch<{ task: TaskDTO }>('/api/tasks', { path: task.path, line: task.line, raw: task.raw, ...change }),
-    onSuccess: () => qc.invalidateQueries(),
+    onSuccess: (r, { task, change }) => {
+      void qc.invalidateQueries();
+      if (change.action !== 'complete') return;
+      const doneTask = r.task.status === 'done' ? r.task : null;
+      toast(
+        <span className="row" style={{ gap: 10, flexWrap: 'nowrap' }}>
+          <span>
+            Выполнено: «{task.title.length > 40 ? task.title.slice(0, 40) + '…' : task.title}»{r.task.status !== 'done' ? '. Создано следующее повторение' : ''}
+          </span>
+          {doneTask && (
+            <button
+              className="btn small"
+              onClick={() =>
+                // Строка могла уже исчезнуть из списка, поэтому вызываем API напрямую.
+                void api
+                  .patch('/api/tasks', { path: doneTask.path, line: doneTask.line, raw: doneTask.raw, action: 'reopen' })
+                  .then(() => toast('Задача снова в работе'))
+                  .catch((e: Error) => toast(e.message, 'error'))
+                  .finally(() => void qc.invalidateQueries())
+              }
+            >
+              Отменить
+            </button>
+          )}
+        </span>,
+        'info',
+        7000,
+      );
+    },
     onError: (e: Error) => {
       toast(e.message, 'error');
       void qc.invalidateQueries();

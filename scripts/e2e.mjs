@@ -197,6 +197,21 @@ try {
     await shot('backlog');
   });
 
+  await step('Бэклог: выполненная задача видна в «Недавно выполненных» и возвращается «Отменить»', async () => {
+    await page.goto(`${base}/backlog`);
+    const item = page.locator('li.task', { hasText: 'Получить три сметы' }).first();
+    await item.waitFor();
+    await item.getByRole('button', { name: 'Отметить выполненной' }).click();
+    await expectText('Выполнено: «Получить три сметы»');
+    const done = page.locator('section', { hasText: 'Недавно выполненные' }).locator('li.task', { hasText: 'Получить три сметы' });
+    await done.waitFor();
+    await page.getByRole('button', { name: 'Отменить' }).click();
+    await expectText('Задача снова в работе');
+    await done.waitFor({ state: 'detached' });
+    const raw = await fs.readFile(path.join(vault, 'Projects', 'Ремонт балкона.md'), 'utf8');
+    if (!/- \[ \] Получить три сметы/.test(raw)) throw new Error('Задача не вернулась в работу');
+  });
+
   await step('Работа: вакансия проходит по воронке, собеседование попадает в файл и календарь', async () => {
     await page.goto(`${base}/work`);
     await expectText('Product Manager — Acme');
