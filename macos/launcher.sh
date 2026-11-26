@@ -51,6 +51,11 @@ fail() {
 start() {
   mkdir -p "$DATA_DIR"
   rm -f "$STATE"
+  # Если прошлый запуск ещё останавливает сервер — ждём, чтобы не подхватить уходящий сервер.
+  for _ in $(seq 1 40); do
+    [ -f "$DATA_DIR/app-stopping" ] || break
+    sleep 0.25
+  done
   if healthy; then
     # Сервер уже работает (например, запущен ярлыком .command) — им и пользуемся.
     exit 0
@@ -162,6 +167,8 @@ window_state() {
 }
 
 stop() {
+  touch "$DATA_DIR/app-stopping"
+  trap 'rm -f "$DATA_DIR/app-stopping"' EXIT
   local w
   w=$(window_pid)
   [ -n "$w" ] && kill "$w" 2>/dev/null
