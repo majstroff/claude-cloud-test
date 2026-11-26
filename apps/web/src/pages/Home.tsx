@@ -316,7 +316,7 @@ function Stat({ value, label, to, tone }: { value: number; label: string; to: st
   return (
     <Link to={to} className="card" style={{ padding: 16 }}>
       <div style={{ fontSize: 28, fontWeight: 500, letterSpacing: '-0.02em', color: tone }}>{value}</div>
-      <div className="small muted">{label}</div>
+      <div style={{ fontSize: 14, color: 'var(--text-2)', marginTop: 2 }}>{label}</div>
     </Link>
   );
 }

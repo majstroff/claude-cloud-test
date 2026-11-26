@@ -119,7 +119,7 @@ function Stat({ label, value, hint, tone }: { label: string; value: number | nul
         {rub(value)}
       </div>
       <div className="small muted">{label}</div>
-      {hint && <div className="small muted" style={{ fontSize: 11, marginTop: 2 }}>{hint}</div>}
+      {hint && <div className="small muted" style={{ marginTop: 2 }}>{hint}</div>}
     </div>
   );
 }
