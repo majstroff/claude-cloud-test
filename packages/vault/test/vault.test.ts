@@ -67,6 +67,42 @@ describe('Vault: чтение', () => {
   });
 });
 
+describe('Vault: записи внутри заметки', () => {
+  it('показывает записи по разделам, меняет, удаляет и возвращает строку', async () => {
+    const { vault, dir } = await openSample();
+    const rel = 'Resources/Обучение/Книги/Inspired.md';
+    const file = path.join(dir, rel);
+    const original = await fs.readFile(file, 'utf8');
+    const secs = await vault.noteLines(rel);
+    expect(secs.map((s) => s.heading)).toEqual(['Конспект', 'Цитаты', 'Выводы', 'Действия']);
+    const q = secs.find((s) => s.heading === 'Цитаты')!.items[0]!;
+    expect(q.raw).toMatch(/^> Лучшие команды/);
+
+    await vault.editLine(rel, q.line, q.raw, '> Новая цитата (с. 1)');
+    expect(await fs.readFile(file, 'utf8')).toContain('## Цитаты\n> Новая цитата (с. 1)\n');
+    await expect(vault.editLine(rel, q.line, q.raw, 'x')).rejects.toMatchObject({ code: 'conflict' });
+    await expect(vault.editLine(rel, q.line, '> Новая цитата (с. 1)', 'две\nстроки')).rejects.toMatchObject({ code: 'invalid' });
+    await expect(vault.editLine(rel, 1, 'type: book', 'type: x')).rejects.toMatchObject({ code: 'invalid' });
+
+    const del = await vault.editLine(rel, q.line, '> Новая цитата (с. 1)', null);
+    expect(await fs.readFile(file, 'utf8')).not.toContain('Новая цитата');
+    await vault.insertLine(rel, del.line, q.raw);
+    expect(await fs.readFile(file, 'utf8')).toBe(original);
+  });
+
+  it('не считает записями шапку таблицы и строки подразделов', async () => {
+    const { vault, dir } = await openSample();
+    const rel = 'Inbox/Таблица.md';
+    await fs.writeFile(path.join(dir, rel), '# T\n\n## Операции\n| Дата | Сумма |\n|---|---:|\n| 2026-11-01 | 10 |\n### Детали\n- пункт\n');
+    await vault.refresh(rel);
+    const secs = await vault.noteLines(rel);
+    expect(secs).toEqual([
+      { heading: 'Операции', items: [{ line: 5, raw: '| 2026-11-01 | 10 |' }] },
+      { heading: 'Детали', items: [{ line: 7, raw: '- пункт' }] },
+    ]);
+  });
+});
+
 describe('Vault: запись', () => {
   it('создаёт заметку с YAML и не перезаписывает существующую', async () => {
     const { vault, dir } = await openSample();

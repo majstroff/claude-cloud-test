@@ -1,3 +1,4 @@
+import { NoteLinesCard } from '../components/NoteLines.tsx';
 import { useMemo, useState, type MouseEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -100,6 +101,7 @@ export function NotePage() {
         </section>
       </div>
       <div className="stack">
+        {!editing && <NoteLinesCard path={path} />}
         {fmEntries.length > 0 && (
           <section className="card">
             <h3 className="card-title" style={{ marginBottom: 10 }}>Свойства</h3>

@@ -289,6 +289,25 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
     return { path: n.path };
   });
 
+  // Отдельные записи заметки (цитаты, журнал, история…): правка и удаление строк.
+  app.get('/api/note/lines', async (req) => ({ sections: await vault.noteLines(required(str(query(req).path), 'path')) }));
+  const lineRef = (b: Record<string, unknown>) => {
+    if (typeof b.line !== 'number' || typeof b.raw !== 'string') throw new HttpError(400, 'Нужны line и raw записи');
+    return { path: required(str(b.path), 'path'), line: b.line, raw: b.raw };
+  };
+  app.post('/api/note/line', async (req) => {
+    const b = obj(req.body);
+    const r = lineRef(b);
+    const text = b.text === null ? null : typeof b.text === 'string' ? b.text : undefined;
+    if (text === undefined) throw new HttpError(400, 'Нужен text (строка) или null для удаления');
+    return { ...(await vault.editLine(r.path, r.line, r.raw, text)), path: r.path };
+  });
+  app.post('/api/note/line/restore', async (req) => {
+    const r = lineRef(obj(req.body));
+    await vault.insertLine(r.path, r.line, r.raw);
+    return { ok: true };
+  });
+
   app.post('/api/note/trash', async (req) => {
     const b = obj(req.body);
     const rel = required(str(b.path), 'path');

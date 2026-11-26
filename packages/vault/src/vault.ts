@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { systemClock, type Clock } from './dates.ts';
 import { buildNote, parseFrontmatter, splitFrontmatter, updateFrontmatter, type Frontmatter } from './frontmatter.ts';
-import { extractFrontmatterLinks, extractLinks, extractTags, firstHeading, maskCode, type RawLink } from './markdown.ts';
+import { extractFrontmatterLinks, extractLinks, extractTags, findSections, firstHeading, maskCode, type RawLink } from './markdown.ts';
 import { SearchIndex, type SearchHit } from './search.ts';
 import { TASK_LINE, effectiveDate, parseTaskLine, type ParsedTask } from './tasks.ts';
 
@@ -683,6 +683,75 @@ export class Vault {
       return lines.join('\n');
     });
     return { note, line: resultLine };
+  }
+
+  /**
+   * Записи заметки по секциям: непустые строки под заголовками (пункты списков,
+   * цитаты, строки таблиц, абзацы). Заголовки, шапки таблиц и код не входят.
+   */
+  async noteLines(rel: string): Promise<Array<{ heading: string; items: Array<{ line: number; raw: string }> }>> {
+    const content = await this.readFresh(rel);
+    const { bodyLine } = splitFrontmatter(content);
+    const lines = content.split('\n').map((l) => l.replace(/\r$/, ''));
+    const out: Array<{ heading: string; items: Array<{ line: number; raw: string }> }> = [];
+    const sections = findSections(lines).filter((s) => s.start >= bodyLine && s.level >= 2);
+    for (const s of sections) {
+      const items: Array<{ line: number; raw: string }> = [];
+      let inFence = false;
+      for (let i = s.start + 1; i < s.end; i++) {
+        const raw = lines[i]!;
+        if (/^\s*```/.test(raw)) {
+          inFence = !inFence;
+          continue;
+        }
+        if (!inFence && /^#{1,6}\s/.test(raw)) break; // подзаголовок — своя секция
+        if (inFence || !raw.trim()) continue;
+        // Шапка таблицы и разделитель |---| — не записи.
+        if (/^\s*\|?\s*:?-{3,}/.test(raw)) continue;
+        if (/^\s*\|/.test(raw) && /^\s*\|?\s*:?-{3,}/.test(lines[i + 1] ?? '')) continue;
+        items.push({ line: i, raw });
+      }
+      if (items.length) out.push({ heading: s.heading, items });
+    }
+    return out;
+  }
+
+  /** Заменяет (text — строка) или удаляет (text = null) одну строку заметки. Свойства и заголовки не трогает. */
+  async editLine(rel: string, line: number, expectedRaw: string, text: string | null): Promise<{ line: number; raw: string }> {
+    if (text !== null) {
+      if (/[\r\n]/.test(text)) throw new VaultError('Запись должна быть одной строкой', 'invalid');
+      if (!text.trim()) throw new VaultError('Запись не может быть пустой. Чтобы убрать её, нажмите «Удалить».', 'invalid');
+    }
+    let at = line;
+    await this.transform(rel, (content) => {
+      const { bodyLine } = splitFrontmatter(content);
+      const lines = content.split('\n');
+      const strip = (x: string | undefined) => (x ?? '').replace(/\r$/, '');
+      let idx = line;
+      if (strip(lines[idx]) !== expectedRaw) {
+        const found = lines.map(strip).flatMap((l, i) => (l === expectedRaw ? [i] : []));
+        if (found.length !== 1) throw new VaultError('Запись изменилась в Obsidian. Обновите страницу и повторите.', 'conflict');
+        idx = found[0]!;
+      }
+      if (idx < bodyLine || /^#{1,6}\s/.test(strip(lines[idx]))) throw new VaultError('Эту строку нельзя менять здесь', 'invalid');
+      at = idx;
+      const cr = lines[idx]!.endsWith('\r') ? '\r' : '';
+      if (text === null) lines.splice(idx, 1);
+      else lines[idx] = text + cr;
+      return lines.join('\n');
+    });
+    return { line: at, raw: expectedRaw };
+  }
+
+  /** Вставляет строку обратно (для «Отменить» после удаления записи). */
+  async insertLine(rel: string, line: number, raw: string): Promise<void> {
+    if (/[\r\n]/.test(raw) || !raw.trim()) throw new VaultError('Некорректная запись', 'invalid');
+    await this.transform(rel, (content) => {
+      const { bodyLine } = splitFrontmatter(content);
+      const lines = content.split('\n');
+      lines.splice(Math.max(bodyLine, Math.min(line, lines.length)), 0, raw);
+      return lines.join('\n');
+    });
   }
 
   /** Перемещает заметку в другую папку (например, в архив). Ссылки по имени продолжают работать. */

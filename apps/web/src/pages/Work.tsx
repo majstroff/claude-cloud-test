@@ -1,3 +1,4 @@
+import { NoteLinesCard } from '../components/NoteLines.tsx';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -435,6 +436,7 @@ export function VacancyPage() {
 
         <div className="stack">
           <EditEntityCard path={v.path} defs={VACANCY_FIELDS} />
+          <NoteLinesCard path={v.path} />
           <section className="card small">
             <div>Рекрутер: <RefLink r={v.recruiter} type="contact" /></div>
             <div>Резюме: <RefLink r={v.resume} type="resume" /></div>

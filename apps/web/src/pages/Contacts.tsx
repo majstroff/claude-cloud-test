@@ -1,3 +1,4 @@
+import { NoteLinesCard } from '../components/NoteLines.tsx';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -353,6 +354,7 @@ export function ContactPage() {
             </section>
           )}
           <EditEntityCard path={c.path} defs={CONTACT_FIELDS} />
+          <NoteLinesCard path={c.path} />
           <RelatedCard related={c.related} emptyHint="Упомяните контакт в проекте или задаче: [[Имя]]." />
         </div>
       </div>
@@ -457,6 +459,7 @@ export function CompanyPage() {
         <div className="stack">
           <LogInteraction path={c.path} today={today} withNext={false} />
           <EditEntityCard path={c.path} defs={COMPANY_FIELDS} />
+          <NoteLinesCard path={c.path} />
           <RelatedCard related={c.related} emptyHint="Свяжите компанию с проектом, контактами и документами." />
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { NoteLinesCard } from '../components/NoteLines.tsx';
 import { useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -129,6 +130,7 @@ function Shell({ path, title, sub, chips, children, side, type }: { path: string
       </div>
       <div className="stack">
         <EditEntityCard path={path} defs={fieldsFor(type)} />
+        <NoteLinesCard path={path} />
         {side}
       </div>
     </div>

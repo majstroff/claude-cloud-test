@@ -1,3 +1,4 @@
+import { NoteLinesCard } from '../components/NoteLines.tsx';
 import { useDeferredValue, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -384,6 +385,7 @@ export function KnowledgeItemPage() {
         </div>
         <div className="stack">
           {fieldsFor(n.type).length > 0 && <EditEntityCard path={n.path} defs={fieldsFor(n.type)} />}
+          <NoteLinesCard path={n.path} />
         </div>
       </div>
     </div>

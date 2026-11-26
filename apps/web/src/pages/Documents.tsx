@@ -1,3 +1,4 @@
+import { NoteLinesCard } from '../components/NoteLines.tsx';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -265,6 +266,7 @@ export function DocumentPage() {
         </div>
         <div className="stack">
           <EditEntityCard path={d.path} defs={DOCUMENT_FIELDS} />
+          <NoteLinesCard path={d.path} />
           <RelatedCard related={d.related} emptyHint="Сошлитесь на документ из проекта или поездки: [[Название]]." />
         </div>
       </div>

@@ -483,3 +483,8 @@ label.field { display: grid; gap: 6px; font-size: 13px; color: var(--text-2); }
   .list li > div.li, .list li > form.li { flex-wrap: wrap; }
   .list li > div.li .li-main, .list li > form.li .li-main { flex-basis: calc(100% - 20px); }
 }
+
+button.plain { border: 0; background: transparent; padding: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; }
+.list li > form.row { padding: 6px 0; }
+.list li.line-row { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 10px; }
+.list li.line-row:hover { background: var(--surface-2); }

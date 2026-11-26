@@ -407,6 +407,24 @@ try {
     await shot('learning');
   });
 
+  await step('Записи в заметке: цитату можно изменить, удалить и вернуть', async () => {
+    const rel = 'Resources/Обучение/Книги/Inspired.md';
+    await page.goto(`${base}/item?path=${encodeURIComponent(rel)}`);
+    await page.getByRole('button', { name: /Записи в заметке/ }).click();
+    await page.getByRole('button', { name: /^Изменить запись: Лучшие команды/ }).click();
+    await page.getByLabel('Текст записи').fill('Лучшие команды любят проблему. (с. 45)');
+    await page.getByLabel('Текст записи').press('Enter');
+    await expectText('Запись изменена');
+    if (!(await readVault(rel)).includes('> Лучшие команды любят проблему. (с. 45)')) throw new Error('Цитата не изменена');
+    await page.getByRole('button', { name: /^Удалить запись: Лучшие команды любят/ }).click();
+    await page.getByRole('button', { name: 'Да, удалить' }).click();
+    await expectText('Запись удалена');
+    if ((await readVault(rel)).includes('любят проблему')) throw new Error('Цитата не удалена');
+    await page.getByRole('button', { name: 'Отменить' }).click();
+    await expectText('Запись возвращена');
+    if (!(await readVault(rel)).includes('> Лучшие команды любят проблему. (с. 45)')) throw new Error('Цитата не вернулась');
+  });
+
   await step('Практики: запись попадает в ежедневную заметку', async () => {
     await page.goto(`${base}/practices`);
     await page.getByLabel('Минут').fill('15');
