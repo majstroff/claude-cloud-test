@@ -361,12 +361,15 @@ function SectionEditor({ date, section, value, placeholder, rows }: { date: stri
   );
 }
 
-function Metrics({ date, mood, energy }: { date: string; mood: number | null; energy: number | null }) {
+export function Metrics({ date, mood, energy }: { date: string; mood: number | null; energy: number | null }) {
   const qc = useQueryClient();
   const toast = useToast();
   const m = useMutation({
     mutationFn: (v: { mood?: number | null; energy?: number | null }) => api.put<DayData>('/api/day/metrics', { date, ...v }),
-    onSuccess: (data) => qc.setQueryData(['day', date], data),
+    onSuccess: (data) => {
+      qc.setQueryData(['day', date], data);
+      void qc.invalidateQueries({ queryKey: ['journal'] });
+    },
     onError: (e: Error) => toast(e.message, 'error'),
   });
   const scale = (label: string, key: 'mood' | 'energy', value: number | null) => (

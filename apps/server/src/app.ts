@@ -3,7 +3,9 @@ import path from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import {
+  Assistant,
   Crm,
+  Journal,
   Life,
   Spheres,
   Vault,
@@ -21,6 +23,7 @@ import { StateStore } from './state.ts';
 import { registerCrmRoutes } from './crm-routes.ts';
 import { registerSpheresRoutes } from './spheres-routes.ts';
 import { registerPersonalRoutes } from './personal-routes.ts';
+import { registerJournalRoutes } from './journal-routes.ts';
 import { KNOWN_INTEGRATIONS, registerIntegrations, type IntegrationStatus } from './integrations.ts';
 
 export interface AppOptions {
@@ -57,7 +60,7 @@ const TASK_VIEWS: TaskView[] = ['today', 'overdue', 'upcoming', 'backlog', 'done
 const FOLDER_KEYS: Array<keyof FolderConfig> = [
   'projects', 'areas', 'resources', 'archive', 'goals', 'cycles', 'ideas', 'inbox', 'daily', 'events',
   'work', 'contacts', 'companies', 'documents', 'finance', 'health', 'learning', 'practices', 'home',
-  'knowledge', 'travel', 'relationships',
+  'knowledge', 'travel', 'relationships', 'reviews',
 ];
 
 export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { vault: Vault; life: Life; crm: Crm; spheres: Spheres }> {
@@ -68,6 +71,8 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
   const life = new Life(vault);
   const crm = new Crm(life);
   const spheres = new Spheres(life);
+  const journal = new Journal(life, spheres);
+  const assistant = new Assistant(life, spheres, crm);
   if (opts.watch) vault.watch();
   app.addHook('onClose', async () => vault.unwatch());
 
@@ -117,7 +122,8 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
         statuses.push({ ...known, state: 'not_installed', message: 'Модуль интеграции ещё не подключён к этой сборке' });
       }
     }
-    return { ok: true, today: vault.today(), vault: vault.stats(), integrations: statuses };
+    // clients — сколько окон интерфейса сейчас открыто (по потокам событий); нужно программе «Лёгкость.app».
+    return { ok: true, today: vault.today(), vault: vault.stats(), integrations: statuses, clients: streams.size };
   });
 
   app.post('/api/reindex', async () => {
@@ -312,7 +318,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
   });
 
   // --- Главная, день, календарь ---
-  app.get('/api/dashboard', async () => ({ ...life.dashboard(), reminders: crm.reminders(), spheres: spheres.dashboard() }));
+  app.get('/api/dashboard', async () => ({ ...life.dashboard(), reminders: crm.reminders(), spheres: spheres.dashboard(), journal: { streak: journal.streak(), writtenToday: !!journal.summary(vault.today(), 0)?.written } }));
 
   app.get('/api/day', async (req) => {
     const date = str(query(req).date) ?? vault.today();
@@ -432,6 +438,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
   registerCrmRoutes(app, crm, spheres);
   registerSpheresRoutes(app, spheres);
   registerPersonalRoutes(app, spheres, crm);
+  registerJournalRoutes(app, journal, assistant);
 
   app.all('/api/*', async (req, reply) => reply.code(404).send({ error: `Нет такого метода API: ${req.method} ${req.url.split('?')[0]}` }));
 

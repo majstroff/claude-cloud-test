@@ -89,6 +89,8 @@ export interface FolderConfig {
   travel: string;
   /** Отношения: важные даты и близкие люди. */
   relationships: string;
+  /** Итоги недели и месяца. */
+  reviews: string;
   /** Формат имени файла ежедневной заметки (поддерживаются YYYY, MM, DD). */
   dailyFormat: string;
   dailyTemplate: string | null;
@@ -336,6 +338,7 @@ export class Vault {
       knowledge: byBase(/^(knowledge|knowledge base|wiki|знания|база знаний)$/i, `${resources}/Знания`),
       travel: byBase(/^(travel|travels|trips|путешествия|поездки)$/i, `${areas}/Путешествия`),
       relationships: byBase(/^(relationships|relations|отношения|близкие)$/i, `${areas}/Отношения`),
+      reviews: byBase(/^(reviews?|итоги|обзоры)$/i, `${areas}/Итоги`),
       daily,
       dailyFormat,
       dailyTemplate,

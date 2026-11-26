@@ -17,3 +17,5 @@ export * from './knowledge.ts';
 export * from './travel.ts';
 export * from './relationships.ts';
 export * from './spheres.ts';
+export * from './journal.ts';
+export * from './assistant.ts';

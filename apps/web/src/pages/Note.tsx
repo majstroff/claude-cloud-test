@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { Lock, Pencil, Star } from 'lucide-react';
+import { Lock, Pencil, Star, WandSparkles } from 'lucide-react';
 import { api, ApiError, type Health, type NoteData, type NoteSummary } from '../api.ts';
 import { TaskList } from '../components/TaskList.tsx';
 import { Empty, ErrorBox, Loading, TYPE_LABEL, noteHref, useToast } from '../components/ui.tsx';
@@ -73,6 +73,11 @@ export function NotePage() {
             {n.type === 'project' && (
               <Link className="btn small" to={`/projects/view?path=${encodeURIComponent(n.path)}`}>
                 Карточка проекта
+              </Link>
+            )}
+            {!n.sensitive && n.type !== 'document' && n.type !== 'daily' && (
+              <Link className="btn small" to={`/assistant?tool=note&path=${encodeURIComponent(n.path)}`}>
+                <WandSparkles size={14} /> Помощник
               </Link>
             )}
             <button className="btn small icon" aria-label={n.favorite ? 'Убрать из избранного' : 'В избранное'} onClick={() => fav.mutate({ path: n.path, favorite: !n.favorite })}>

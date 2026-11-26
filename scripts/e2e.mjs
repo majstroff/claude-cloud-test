@@ -436,6 +436,73 @@ try {
     if (!(await readVault('Resources/Контакты/Мама.md')).includes('- Тёплый плед')) throw new Error('Идея не записана');
   });
 
+  await step('Дневник: запись сохраняется в ежедневную заметку', async () => {
+    const today = await todayDate();
+    await page.goto(`${base}/journal`);
+    await page.getByLabel('Запись дневника').fill('E2E: день прошёл спокойно');
+    await page.getByRole('button', { name: 'Сохранить', exact: true }).click();
+    await expectText('Запись сохранена');
+    if (!(await readVault(`Daily/${today}.md`)).includes('## Дневник\nE2E: день прошёл спокойно')) throw new Error('Запись не попала в заметку');
+    await page.getByRole('button', { name: 'Настроение: 4' }).click();
+    await page.waitForFunction(async (d) => (await (await fetch(`/api/journal/entry?date=${d}`)).json()).mood === 4, today);
+    await shot('journal');
+  });
+
+  await step('Итоги недели: цифры, выводы и сохранение в Obsidian', async () => {
+    await page.goto(`${base}/journal?tab=reviews`);
+    await expectText('Выполненные задачи по дням');
+    await expectText('Выводы');
+    await page.getByLabel('Что получилось').fill('E2E: итог недели');
+    await page.getByRole('button', { name: 'Сохранить итоги в Obsidian' }).click();
+    await expectText('Итоги сохранены');
+    const r = await (await fetch(`${base}/api/reviews`)).json();
+    if (!r.reviews.length) throw new Error('Итоги не найдены');
+    const text = await readVault(r.reviews[0].path);
+    if (!/type: review/.test(text) || !text.includes('## Что получилось\nE2E: итог недели')) throw new Error('Заметка итогов неверная');
+    await page.getByRole('button', { name: 'Обновить итоги в Obsidian' }).waitFor();
+    await shot('review');
+  });
+
+  await step('Помощник: план дня записывает приоритеты только по кнопке', async () => {
+    const today = await todayDate();
+    const before = await readVault(`Daily/${today}.md`);
+    await page.goto(`${base}/assistant`);
+    await expectText('Главное (три дела)');
+    await expectText('Платный ИИ не подключён');
+    if ((await readVault(`Daily/${today}.md`)) !== before) throw new Error('Помощник изменил заметку без нажатия');
+    await page.getByRole('button', { name: /приоритеты дня/ }).click();
+    const confirm = page.getByRole('button', { name: 'Да, заменить' });
+    if (await confirm.isVisible().catch(() => false)) await confirm.click();
+    await expectText('Приоритеты записаны');
+    if (!/## Приоритеты\n1\. /.test(await readVault(`Daily/${today}.md`))) throw new Error('Приоритеты не записаны');
+    await shot('assistant-plan');
+  });
+
+  await step('Помощник: дела из заметки превращаются в задачи', async () => {
+    await page.goto(`${base}/note?path=${encodeURIComponent('Inbox/Заметки с созвона с Анной.md')}`);
+    await page.locator('a[href^="/assistant?tool=note"]').click();
+    await expectText('Узнать вилку зарплаты в Beta Bank');
+    await expectText('Связанные записи');
+    await page.getByRole('button', { name: 'Создать задачу' }).first().click();
+    await expectText('Задача создана');
+    const today = await todayDate();
+    if (!(await readVault(`Daily/${today}.md`)).includes('- [ ] Узнать вилку зарплаты в Beta Bank [[Заметки с созвона с Анной]]')) throw new Error('Задача не создана');
+    await shot('assistant-note');
+  });
+
+  await step('Помощник: просрочки и поиск работы', async () => {
+    await page.goto(`${base}/assistant?tool=overdue`);
+    await expectText('Разбор просрочек');
+    await page.goto(`${base}/assistant?tool=job`);
+    await expectText('Воронка');
+    await expectText('Тестовое до');
+  });
+
+  await step('Документы недоступны помощнику', async () => {
+    const r = await fetch(`${base}/api/assistant/related?path=${encodeURIComponent('Areas/Документы/РВП.md')}`);
+    if (r.status !== 403) throw new Error(`Ожидался отказ, получено ${r.status}`);
+  });
+
   await step('Тёмная тема и мобильная ширина', async () => {
     await page.goto(base);
     await page.getByRole('button', { name: 'Сменить тему' }).click();

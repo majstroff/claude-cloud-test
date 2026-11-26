@@ -26,6 +26,8 @@ import {
   Sun,
   SunMoon,
   Target,
+  NotebookPen,
+  WandSparkles,
 } from 'lucide-react';
 import { api, type Dashboard, type Priority, type SearchResult, type NoteSummary } from '../api.ts';
 import { TYPE_LABEL, noteHref, useTheme, useToast, fmtDate } from './ui.tsx';
@@ -49,6 +51,8 @@ const NAV = [
   { to: '/knowledge', label: 'Знания', icon: BookMarked },
   { to: '/travel', label: 'Путешествия', icon: Plane },
   { to: '/relationships', label: 'Отношения', icon: Heart, badge: 'occasions' as const },
+  { to: '/journal', label: 'Дневник и итоги', icon: NotebookPen },
+  { to: '/assistant', label: 'Помощник', icon: WandSparkles },
 ];
 
 const TITLES: Record<string, string> = {
@@ -76,6 +80,8 @@ const TITLES: Record<string, string> = {
   '/travel': 'Путешествия',
   '/travel/view': 'Поездка',
   '/relationships': 'Отношения',
+  '/journal': 'Дневник и итоги',
+  '/assistant': 'Помощник',
   '/item': 'Запись',
   '/note': 'Заметка',
   '/favorites': 'Избранное',
