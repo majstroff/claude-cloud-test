@@ -83,20 +83,34 @@ find_browser() {
   return 1
 }
 
+# Главный процесс окна программы (Chrome с отдельным профилем), без вспомогательных процессов.
 window_pid() {
-  pgrep -f -- "--user-data-dir=$PROFILE" | head -1
+  ps -axo pid=,command= | grep -F -- "--user-data-dir=$PROFILE" | grep -v -- "--type=" | grep -v grep | awk '{print $1}' | head -1
 }
 
+clients() {
+  curl -fsS --max-time 2 "$URL/api/health" 2>/dev/null | grep -o '"clients":[0-9]*' | cut -d: -f2
+}
+
+# Вывести окно программы вперёд по номеру процесса (без разрешений «Универсального доступа»).
+activate_pid() {
+  osascript -l JavaScript -e "ObjC.import('AppKit'); var a = \$.NSRunningApplication.runningApplicationWithProcessIdentifier($1); a.isNil() ? 'no' : (a.activateWithOptions(3) ? 'ok' : 'no')" 2>/dev/null
+}
+
+# Важно: всегда запускаем браузер с отдельным профилем (open -n … --user-data-dir).
+# Команда «open -a "Google Chrome"» без профиля открыла бы обычный Chrome пользователя.
 open_window() {
-  if [ -n "$(window_pid)" ]; then
-    # Окно уже открыто — открываем в нём главную ещё раз (macOS выведет его вперёд).
-    BROWSER=$(find_browser) && open -a "$BROWSER" --args --user-data-dir="$PROFILE" --app="$URL"
+  local pid n
+  pid=$(window_pid)
+  n=$(clients)
+  if [ -n "$pid" ] && [ "${n:-0}" -gt 0 ] && [ "$(activate_pid "$pid")" = "ok" ]; then
     echo app
     return
   fi
   if BROWSER=$(find_browser); then
     mkdir -p "$PROFILE"
-    open -na "$BROWSER" --args --user-data-dir="$PROFILE" --app="$URL" --no-first-run --no-default-browser-check
+    # Если окно-процесс уже есть, Chrome с тем же профилем откроет окно программы в нём.
+    open -na "$BROWSER" --args --user-data-dir="$PROFILE" --app="$URL/?shell=mac" --no-first-run --no-default-browser-check
     echo app
   else
     open "$URL"
@@ -108,7 +122,7 @@ open_window() {
 # Закрыто — когда окно уже было и потоков нет три проверки подряд (перезагрузка страницы не считается).
 window_state() {
   local clients
-  clients=$(curl -fsS --max-time 2 "$URL/api/health" 2>/dev/null | grep -o '"clients":[0-9]*' | cut -d: -f2)
+  clients=$(clients)
   if [ -z "$clients" ]; then
     # Сервер не отвечает — значит, его остановили.
     if [ -f "$STATE" ]; then echo closed; else echo waiting; fi

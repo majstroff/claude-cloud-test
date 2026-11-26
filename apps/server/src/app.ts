@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { execFile } from 'node:child_process';
 import path from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
@@ -36,6 +37,21 @@ export interface AppOptions {
   logger?: boolean;
   /** Подмена интеграций в тестах (см. IntegrationContext). */
   integrations?: { todoist?: import('@frame-os/todoist').TodoistSyncService | null };
+  /**
+   * Открыть внешнюю ссылку в браузере по умолчанию (для окна программы «Лёгкость.app»).
+   * По умолчанию на macOS — команда `open`, на других системах недоступно.
+   */
+  openExternal?: ((url: string) => Promise<void>) | null;
+}
+
+const EXTERNAL_SCHEMES = ['http:', 'https:', 'mailto:', 'tel:', 'obsidian:'];
+
+function defaultOpenExternal(): ((url: string) => Promise<void>) | null {
+  if (process.platform !== 'darwin') return null;
+  return (url) =>
+    new Promise((resolve, reject) => {
+      execFile('open', [url], (err) => (err ? reject(err) : resolve()));
+    });
 }
 
 export class HttpError extends Error {
@@ -108,6 +124,22 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
   });
 
   // --- Служебное ---
+  const openExternal = opts.openExternal === undefined ? defaultOpenExternal() : opts.openExternal;
+  app.post('/api/open-external', async (req) => {
+    const raw = (req.body as { url?: unknown } | null)?.url;
+    if (typeof raw !== 'string' || raw.length > 4000) throw new HttpError(400, 'Нужна ссылка');
+    let url: URL;
+    try {
+      url = new URL(raw);
+    } catch {
+      throw new HttpError(400, 'Некорректная ссылка');
+    }
+    if (!EXTERNAL_SCHEMES.includes(url.protocol)) throw new HttpError(400, 'Такие ссылки открывать нельзя');
+    if (!openExternal) throw new HttpError(501, 'Открытие во внешнем браузере недоступно на этой системе');
+    await openExternal(url.toString());
+    return { ok: true };
+  });
+
   app.get('/api/health', async () => {
     const statuses: IntegrationStatus[] = [];
     for (const known of KNOWN_INTEGRATIONS) {

@@ -527,6 +527,26 @@ try {
     if ((await page.getByText('Telegram-канал о продуктовой аналитике').count()) > 0) throw new Error('Идея осталась в списке');
   });
 
+  await step('Окно программы: внешняя ссылка уходит в браузер по умолчанию, а не в новое окно', async () => {
+    const opened = [];
+    await page.route('**/api/open-external', async (route) => {
+      opened.push(route.request().postDataJSON().url);
+      await route.fulfill({ json: { ok: true } });
+    });
+    const popups = [];
+    const onPopup = (p) => popups.push(p);
+    page.on('popup', onPopup);
+    await page.goto(`${base}/work/view?path=${encodeURIComponent('Areas/Работа/Вакансии/Product Manager — Acme.md')}&shell=mac`);
+    if (new URL(page.url()).searchParams.has('shell')) throw new Error('Параметр shell остался в адресе');
+    await page.getByRole('link', { name: 'Вакансия' }).click();
+    await page.waitForTimeout(300);
+    page.off('popup', onPopup);
+    await page.unroute('**/api/open-external');
+    if (opened[0] !== 'https://example.com/jobs/acme-pm') throw new Error(`open-external: ${JSON.stringify(opened)}`);
+    if (popups.length) throw new Error('Открылось новое окно браузера');
+    await page.evaluate(() => sessionStorage.removeItem('frame-shell'));
+  });
+
   await step('Тёмная тема и мобильная ширина', async () => {
     await page.goto(base);
     await page.getByRole('button', { name: 'Сменить тему' }).click();

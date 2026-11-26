@@ -27,7 +27,10 @@ import { TravelPage, TripPage } from './pages/Travel.tsx';
 import { RelationshipsPage } from './pages/Relationships.tsx';
 import { JournalPage } from './pages/Journal.tsx';
 import { AssistantPage } from './pages/Assistant.tsx';
+import { installShellLinks } from './shell.ts';
 import './styles.css';
+
+installShellLinks();
 
 const queryClient = new QueryClient({
   defaultOptions: {
