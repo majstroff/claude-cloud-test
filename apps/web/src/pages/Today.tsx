@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, FileText, Moon, Sunrise } from 'lucide-react
 import { api, type DayData, type Health } from '../api.ts';
 import { AddTaskInline, TaskList } from '../components/TaskList.tsx';
 import { MonthCalendar, useCalendar } from '../components/Calendar.tsx';
+import { TodoistPanel } from '../components/Todoist.tsx';
 import { Empty, ErrorBox, Loading, WEEKDAYS_SHORT, addDaysIso, fmtDate, noteHref, parseIso, useToast } from '../components/ui.tsx';
 
 type View = 'day' | 'week' | 'month';
@@ -141,6 +142,8 @@ function DayView({ date, today }: { date: string; today: string }) {
             </>
           )}
         </section>
+
+        {d.isToday && <TodoistPanel today={today} />}
 
         {d.events.length > 0 && (
           <section className="card">

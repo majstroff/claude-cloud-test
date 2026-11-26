@@ -18,8 +18,9 @@
     "sample-vault": "node scripts/sample-vault.mjs",
     "test": "vitest run",
     "test:e2e": "node scripts/e2e.mjs",
-    "typecheck": "tsc -p packages/vault --noEmit && tsc -p apps/server --noEmit && tsc -p apps/web --noEmit",
-    "check": "npm run typecheck && npm test"
+    "typecheck": "tsc -p packages/vault --noEmit && tsc -p packages/todoist --noEmit && tsc -p apps/server --noEmit && tsc -p apps/web --noEmit",
+    "check": "npm run typecheck && npm test",
+    "check:todoist": "npm run check:todoist -w @frame-os/todoist"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

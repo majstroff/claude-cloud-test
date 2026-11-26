@@ -26,6 +26,8 @@ export interface AppOptions {
   webDist?: string | null;
   watch?: boolean;
   logger?: boolean;
+  /** Подмена интеграций в тестах (см. IntegrationContext). */
+  integrations?: { todoist?: import('@frame-os/todoist').TodoistSyncService | null };
 }
 
 export class HttpError extends Error {
@@ -83,7 +85,13 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
     return reply.code(500).send({ error: `Внутренняя ошибка: ${err.message}` });
   });
 
-  const integrations = await registerIntegrations(app, { vault, life, dataDir: opts.dataDir });
+  const integrations = await registerIntegrations(app, {
+    vault,
+    life,
+    dataDir: opts.dataDir,
+    background: opts.watch ?? false,
+    ...(opts.integrations && 'todoist' in opts.integrations ? { todoist: opts.integrations.todoist } : {}),
+  });
 
   // --- Служебное ---
   app.get('/api/health', async () => {

@@ -45,6 +45,8 @@ export interface TodoistSyncServiceOptions {
   vaultName?: string;
   /** Push each change right after it is made. Default true. */
   autoFlush?: boolean;
+  /** Called after every successful sync(), e.g. to mirror completions into the vault. */
+  onSync?: (result: SyncResult) => Promise<void> | void;
 }
 
 /**
@@ -62,6 +64,7 @@ export class TodoistSyncService {
   readonly #now: () => Date;
   readonly #vaultName?: string;
   readonly #autoFlush: boolean;
+  readonly #onSync?: (result: SyncResult) => Promise<void> | void;
   #lock: Promise<unknown> = Promise.resolve();
   #syncing = false;
 
@@ -72,6 +75,7 @@ export class TodoistSyncService {
     this.#now = opts.now ?? (() => new Date());
     this.#vaultName = opts.vaultName;
     this.#autoFlush = opts.autoFlush ?? true;
+    this.#onSync = opts.onSync;
   }
 
   get configured() {
@@ -320,7 +324,13 @@ export class TodoistSyncService {
   // ---------- sync ----------
 
   /** Full two-way sync: pull from Todoist, then push queued local changes. */
-  sync(): Promise<SyncResult> {
+  async sync(): Promise<SyncResult> {
+    const result = await this.#syncOnce();
+    if (this.#onSync) await this.#onSync(result);
+    return result;
+  }
+
+  #syncOnce(): Promise<SyncResult> {
     return this.#exclusive(async () => {
       const client = this.#requireClient();
       this.#syncing = true;
@@ -366,7 +376,7 @@ export class TodoistSyncService {
    * Periodic background sync. Backs off after errors and honours Retry-After.
    * Returns a stop function.
    */
-  startAutoSync(intervalMs = 5 * 60_000, onError?: (e: TodoistError) => void): () => void {
+  startAutoSync(intervalMs = 5 * 60_000, onError?: (e: TodoistError) => void, firstDelayMs = 0): () => void {
     let timer: NodeJS.Timeout | undefined;
     let stopped = false;
     let failures = 0;
@@ -385,7 +395,7 @@ export class TodoistSyncService {
       }
       if (!stopped) timer = setTimeout(run, delay);
     };
-    timer = setTimeout(run, 0);
+    timer = setTimeout(run, firstDelayMs);
     return () => {
       stopped = true;
       clearTimeout(timer);
@@ -436,11 +446,13 @@ export class TodoistSyncService {
         t.syncState !== "remote_deleted",
     );
     if (missing.length) {
-      const until = this.#now();
+      const now = this.#now();
+      // A day of slack on both ends covers clock skew between this machine and Todoist.
+      const until = new Date(now.getTime() + DAY);
       const since = new Date(
         Math.max(
           until.getTime() - 89 * DAY, // API window limit
-          (s.lastSyncAt ? Date.parse(s.lastSyncAt) : until.getTime() - 30 * DAY) - DAY,
+          (s.lastSyncAt ? Date.parse(s.lastSyncAt) : now.getTime() - 30 * DAY) - DAY,
         ),
       );
       const done = await client.listCompletedTasks(since.toISOString(), until.toISOString());
@@ -449,7 +461,7 @@ export class TodoistSyncService {
         const d = doneById.get(t.todoistId!);
         if (d) {
           t.completed = true;
-          t.completedAt = d.completed_at ?? until.toISOString();
+          t.completedAt = d.completed_at ?? now.toISOString();
           t.syncState = "synced";
           result.pulled++;
         } else {

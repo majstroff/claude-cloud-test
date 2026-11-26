@@ -10,6 +10,7 @@ import {
   parseTaskLine,
   reopenTaskLine,
   setTaskDueLine,
+  setTaskTodoistLine,
   setTaskPriorityLine,
 } from '../src/tasks.ts';
 
@@ -48,6 +49,17 @@ describe('frontmatter', () => {
 });
 
 describe('задачи', () => {
+  it('понимает и ставит метку отправки в Todoist', () => {
+    const t = parseTaskLine('- [ ] Купить кроссовки #спорт [todoist:: 6X7rM8997g3RQmvh]');
+    expect(t).toMatchObject({ title: 'Купить кроссовки #спорт', todoistId: '6X7rM8997g3RQmvh', tags: ['спорт'] });
+    expect(parseTaskLine('- [ ] Без метки')!.todoistId).toBeNull();
+    const marked = setTaskTodoistLine('- [ ] Купить 🔼', '123');
+    expect(marked).toBe('- [ ] Купить 🔼 [todoist:: 123]');
+    expect(setTaskTodoistLine(marked, '456')).toBe('- [ ] Купить 🔼 [todoist:: 456]');
+    expect(setTaskTodoistLine(marked, null)).toBe('- [ ] Купить 🔼');
+    expect(() => setTaskTodoistLine('- [ ] x', 'a] [due:: 2026-01-01')).toThrow();
+  });
+
   it('понимает формат Obsidian Tasks', () => {
     const t = parseTaskLine('  - [ ] Позвонить в банк ⏫ 🔁 every week 📅 2026-11-25 #финансы')!;
     expect(t).toMatchObject({
