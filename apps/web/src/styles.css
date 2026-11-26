@@ -225,6 +225,10 @@ label.field { display: grid; gap: 6px; font-size: 12px; color: var(--text-2); }
 .task .t-actions { display: flex; gap: 2px; opacity: 0; transition: opacity .1s; }
 .task:hover .t-actions, .task:focus-within .t-actions { opacity: 1; }
 .task.busy { opacity: 0.5; pointer-events: none; }
+.task .t-side { flex: 0 0 auto; align-self: center; }
+@media (max-width: 640px) { .task .t-side .lbl { display: none; } .task .t-side .btn.small { width: 28px; padding: 0; justify-content: center; } }
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ---------- Пустые состояния и ошибки ---------- */
 .empty { text-align: center; padding: 28px 16px; color: var(--text-3); display: grid; gap: 8px; justify-items: center; }

@@ -5,10 +5,12 @@ import { Inbox } from 'lucide-react';
 import { api, type Health, type TaskDTO } from '../api.ts';
 import { AddTaskInline, TaskList } from '../components/TaskList.tsx';
 import { Empty, ErrorBox, Loading } from '../components/ui.tsx';
+import { SendToTodoistButton, isTodoistReady, useTodoistProjects } from '../components/Todoist.tsx';
 
 /**
  * Бэклог — открытые задачи без даты из всех заметок хранилища (кроме архива).
- * Отправка в Todoist появится, когда к серверу будет подключён модуль Todoist.
+ * Кнопка «В Todoist» отправляет задачу в выбранный проект Todoist и помечает строку
+ * в заметке меткой [todoist:: id]; такие задачи дальше ведутся в Todoist.
  */
 export function BacklogPage() {
   const q = useQuery({ queryKey: ['tasks', 'backlog'], queryFn: () => api.get<{ tasks: TaskDTO[] }>('/api/tasks?view=backlog') });
@@ -18,7 +20,11 @@ export function BacklogPage() {
   const [prio, setPrio] = useState('');
   const [tag, setTag] = useState('');
   const today = health.data?.today ?? '';
-  const todoist = health.data?.integrations.find((i) => i.id === 'todoist');
+  const todoist = health.data?.integrations.find((i) => i.id === 'todoist') ?? null;
+  const todoistReady = isTodoistReady(todoist);
+  const projects = useTodoistProjects(todoistReady);
+  const [todoistProject, setTodoistProject] = useState('');
+  const sendButton = todoistReady ? (t: TaskDTO) => <SendToTodoistButton task={t} projectId={todoistProject} /> : undefined;
 
   const tasks = q.data?.tasks ?? [];
   const sources = useMemo(() => {
@@ -80,6 +86,18 @@ export function BacklogPage() {
               ))}
             </select>
           )}
+          {todoistReady && (
+            <select className="select" value={todoistProject} onChange={(e) => setTodoistProject(e.target.value)} aria-label="Проект Todoist для отправки">
+              <option value="">В Todoist: Входящие</option>
+              {(projects.data ?? [])
+                .filter((p) => !p.isInbox)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    В Todoist: {p.name}
+                  </option>
+                ))}
+            </select>
+          )}
           <span className="small muted">
             {filtered.length} из {tasks.length}
           </span>
@@ -101,7 +119,7 @@ export function BacklogPage() {
                 <h3 className="card-title">{g.title}</h3>
                 <span className="card-sub">{g.tasks.length}</span>
               </div>
-              <TaskList tasks={g.tasks} today={today} showSource={false} />
+              <TaskList tasks={g.tasks} today={today} showSource={false} extra={sendButton} />
             </section>
           ))
         )}
@@ -118,7 +136,14 @@ export function BacklogPage() {
             Назначьте срок кнопкой календаря у задачи, и она появится в разделе <Link to="/today">«Сегодня»</Link>. Если задача больше не нужна, отметьте её выполненной или
             удалите строку в Obsidian.
           </p>
-          {todoist && todoist.state !== 'ok' && <p className="muted">Todoist: {todoist.message}.</p>}
+          {todoistReady ? (
+            <p className="muted">
+              «В Todoist» отправляет задачу в выбранный проект и ставит в заметке метку <code>[todoist:: id]</code>. Когда задачу закроют в Todoist, она
+              отметится выполненной и в Obsidian.
+            </p>
+          ) : (
+            todoist && todoist.state !== 'not_installed' && <p className="muted">Todoist: {todoist.message}.</p>
+          )}
         </section>
       </div>
     </div>

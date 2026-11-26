@@ -12,6 +12,7 @@ import {
   reopenTaskLine,
   setTaskDueLine,
   setTaskPriorityLine,
+  setTaskTodoistLine,
   type Priority,
 } from './tasks.ts';
 import { Vault, VaultError, summarize, type Note, type NoteSummary, type VaultTask } from './vault.ts';
@@ -87,7 +88,8 @@ export class Life {
         break;
       }
       case 'backlog':
-        list = list.filter((t) => isOpen(t) && effectiveDate(t) === null && !t.start);
+        // Отправленные в Todoist задачи ведутся там и в бэклоге Obsidian не показываются.
+        list = list.filter((t) => isOpen(t) && effectiveDate(t) === null && !t.start && !t.todoistId);
         break;
       case 'done':
         list = list.filter((t) => t.status === 'done' && t.doneDate === today);
@@ -140,9 +142,10 @@ export class Life {
     path: string;
     line: number;
     raw: string;
-    action: 'complete' | 'reopen' | 'setDue' | 'setPriority';
+    action: 'complete' | 'reopen' | 'setDue' | 'setPriority' | 'setTodoist';
     due?: string | null;
     priority?: Priority;
+    todoistId?: string | null;
   }): Promise<TaskDTO> {
     const today = this.today;
     let due = input.due ?? null;
@@ -163,6 +166,8 @@ export class Life {
           return setTaskDueLine(raw, due);
         case 'setPriority':
           return setTaskPriorityLine(raw, input.priority ?? 'none');
+        case 'setTodoist':
+          return setTaskTodoistLine(raw, input.todoistId ?? null);
       }
     });
     const task = note.tasks.find((t) => t.line === line);

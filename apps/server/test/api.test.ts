@@ -16,7 +16,7 @@ beforeEach(async () => {
   vaultDir = await fs.mkdtemp(path.join(os.tmpdir(), 'frame-os-api-vault-'));
   dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'frame-os-api-data-'));
   await fs.cp(SAMPLE, vaultDir, { recursive: true });
-  app = await buildApp({ vaultPath: vaultDir, dataDir, clock: () => '2026-11-24' });
+  app = await buildApp({ vaultPath: vaultDir, dataDir, clock: () => '2026-11-24', integrations: { todoist: null } });
 });
 
 afterEach(async () => {
@@ -37,7 +37,7 @@ describe('API', () => {
     const { status, body } = await get('/api/health');
     expect(status).toBe(200);
     expect(body.vault.notes).toBeGreaterThan(20);
-    expect(body.integrations).toEqual([expect.objectContaining({ id: 'todoist', state: 'not_installed' })]);
+    expect(body.integrations).toEqual([expect.objectContaining({ id: 'todoist', state: 'not_configured' })]);
   });
 
   it('отклоняет изменения без заголовка X-Frame-OS и чужой Host', async () => {
@@ -130,7 +130,7 @@ describe('API', () => {
   it('избранное хранится вне vault и переживает перезапуск', async () => {
     await send('POST', '/api/favorites', { path: 'Projects/Поиск работы.md' });
     await app.close();
-    app = await buildApp({ vaultPath: vaultDir, dataDir, clock: () => '2026-11-24' });
+    app = await buildApp({ vaultPath: vaultDir, dataDir, clock: () => '2026-11-24', integrations: { todoist: null } });
     const f = await get('/api/favorites');
     expect(f.body.favorites.map((x: { title: string }) => x.title)).toEqual(['Поиск работы']);
     const vaultFiles = await fs.readdir(vaultDir);

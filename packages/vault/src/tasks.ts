@@ -3,7 +3,8 @@ import { addDays, addMonths, isIsoDate } from './dates.ts';
 /**
  * Задачи в Markdown в формате, совместимом с плагином Obsidian Tasks:
  *   - [ ] Позвонить в банк 📅 2026-11-25 ⏫ 🔁 every week #финансы
- * Также понимаются поля Dataview: [due:: 2026-11-25], [scheduled:: …].
+ * Также понимаются поля Dataview: [due:: 2026-11-25], [scheduled:: …],
+ * и метка [todoist:: <id>] — задача отправлена в Todoist и ведётся там.
  */
 
 export type TaskStatus = 'open' | 'done' | 'cancelled' | 'in_progress';
@@ -23,6 +24,8 @@ export interface ParsedTask {
   recurrence: string | null;
   tags: string[];
   indent: string;
+  /** Id задачи в Todoist, если строка была отправлена туда из Frame OS. */
+  todoistId: string | null;
 }
 
 export const TASK_LINE = /^(\s*)([-*+]|\d+[.)])\s+\[(.)\]\s?(.*)$/;
@@ -67,7 +70,7 @@ const DATE_EMOJI: Record<string, 'due' | 'scheduled' | 'start' | 'doneDate' | 'c
 const EMOJI_DATE_RE = /(📅|📆|🗓️?|⏳|⌛|🛫|✅|➕|❌)️?\s*(\d{4}-\d{2}-\d{2})/gu;
 const PRIORITY_RE = /\s*(🔺|⏫|🔼|🔽|⏬)️?/gu;
 const RECUR_RE = /🔁️?\s*([^📅📆🗓⏳⌛🛫✅➕❌🔺⏫🔼🔽⏬#\[]+)/u;
-const DATAVIEW_RE = /\[(due|scheduled|start|completion|created|priority|repeat)::\s*([^\]]*)\]/gi;
+const DATAVIEW_RE = /\[(due|scheduled|start|completion|created|priority|repeat|todoist)::\s*([^\]]*)\]/gi;
 const TAG_RE = /(^|\s)#([\p{L}\p{N}_\-/]+)/gu;
 
 export function parseTaskLine(line: string): ParsedTask | null {
@@ -88,6 +91,7 @@ export function parseTaskLine(line: string): ParsedTask | null {
     recurrence: null,
     tags: [],
     indent,
+    todoistId: null,
   };
 
   text = text.replace(EMOJI_DATE_RE, (_all, emoji: string, date: string) => {
@@ -112,6 +116,8 @@ export function parseTaskLine(line: string): ParsedTask | null {
       if (p in PRIORITY_RANK) task.priority = p;
     } else if (k === 'repeat') {
       task.recurrence = v || null;
+    } else if (k === 'todoist') {
+      task.todoistId = v || null;
     } else if (isIsoDate(v)) {
       if (k === 'due') task.due = v;
       else if (k === 'scheduled') task.scheduled = v;
@@ -188,6 +194,14 @@ export function setTaskPriorityLine(line: string, priority: Priority): string {
   out = out.replace(/\s*\[priority::[^\]]*\]/gi, '');
   const emoji = PRIORITY_TO_EMOJI[priority];
   if (emoji) out = appendToken(out, emoji);
+  return out;
+}
+
+/** Помечает строку задачи как отправленную в Todoist: [todoist:: <id>]. */
+export function setTaskTodoistLine(line: string, todoistId: string | null): string {
+  if (todoistId !== null && !/^[\w-]+$/.test(todoistId)) throw new Error(`Некорректный id Todoist: ${todoistId}`);
+  let out = line.replace(/\s*\[todoist::[^\]]*\]/gi, '');
+  if (todoistId) out = appendToken(out, `[todoist:: ${todoistId}]`);
   return out;
 }
 

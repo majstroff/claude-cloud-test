@@ -5,6 +5,7 @@ import { ArrowRight, CalendarClock, CheckCircle2, FolderKanban, Target } from 'l
 import { api, type Dashboard, type CycleDTO } from '../api.ts';
 import { AddTaskInline, TaskList } from '../components/TaskList.tsx';
 import { MonthCalendar } from '../components/Calendar.tsx';
+import { TodoistPanel } from '../components/Todoist.tsx';
 import { Empty, ErrorBox, Loading, Progress, TYPE_LABEL, noteHref, plural, relDate } from '../components/ui.tsx';
 
 export function HomePage() {
@@ -53,6 +54,8 @@ export function HomePage() {
             )}
             <AddTaskInline due={d.today} placeholder="Задача на сегодня…" />
           </section>
+
+          <TodoistPanel today={d.today} />
 
           <section className="card">
             <div className="card-head">

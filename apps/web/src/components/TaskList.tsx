@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Calendar, Check, Flag, FileText, Repeat, X } from 'lucide-react';
@@ -59,7 +59,7 @@ const PRIO_LABEL: Record<Priority, string> = {
   lowest: 'Самый низкий',
 };
 
-export function TaskItem({ task, today, showSource = true }: { task: TaskDTO; today: string; showSource?: boolean }) {
+export function TaskItem({ task, today, showSource = true, extra }: { task: TaskDTO; today: string; showSource?: boolean; extra?: (t: TaskDTO) => ReactNode }) {
   const m = useTaskAction();
   const [menu, setMenu] = useState<null | 'date' | 'prio'>(null);
   const [customDate, setCustomDate] = useState(task.due ?? '');
@@ -142,6 +142,7 @@ export function TaskItem({ task, today, showSource = true }: { task: TaskDTO; to
           </div>
         )}
       </div>
+      {!done && extra && <div className="t-side">{extra(task)}</div>}
       {!done && (
         <div className="t-actions">
           <button className="btn small icon ghost" title="Срок" aria-label="Изменить срок" onClick={() => setMenu(menu === 'date' ? null : 'date')}>
@@ -159,11 +160,11 @@ export function TaskItem({ task, today, showSource = true }: { task: TaskDTO; to
   );
 }
 
-export function TaskList({ tasks, today, showSource }: { tasks: TaskDTO[]; today: string; showSource?: boolean }) {
+export function TaskList({ tasks, today, showSource, extra }: { tasks: TaskDTO[]; today: string; showSource?: boolean; extra?: (t: TaskDTO) => ReactNode }) {
   return (
     <ul className="tasks">
       {tasks.map((t) => (
-        <TaskItem key={`${t.id}:${t.raw}`} task={t} today={today} showSource={showSource} />
+        <TaskItem key={`${t.id}:${t.raw}`} task={t} today={today} showSource={showSource} extra={extra} />
       ))}
     </ul>
   );
