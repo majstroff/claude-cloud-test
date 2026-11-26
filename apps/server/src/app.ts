@@ -443,7 +443,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
     app.get('/', async (_req, reply) =>
       reply
         .type('text/html; charset=utf-8')
-        .send('<p>Frame OS API работает. Интерфейс не собран: выполните <code>npm run build</code> или запустите <code>npm run dev</code>.</p>'),
+        .send('<p>API «Лёгкость ОС» работает. Интерфейс не собран: выполните <code>npm run build</code> или запустите <code>npm run dev</code>.</p>'),
     );
   }
 

@@ -98,7 +98,7 @@ export function Layout() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const title = TITLES[loc.pathname] ?? 'Frame OS';
+  const title = TITLES[loc.pathname] ?? 'Лёгкость ОС';
   const badges = {
     backlog: dash.data?.backlogCount ?? 0,
     ideas: dash.data?.ideasNew ?? 0,
@@ -137,7 +137,7 @@ export function Layout() {
         <header className="topbar">
           <div>
             <div className="crumb">
-              <span className="dot" /> Frame OS
+              <span className="dot" /> Лёгкость ОС
               <span className={`sync ${live ? '' : 'off'}`} title={live ? 'Изменения из Obsidian подхватываются автоматически' : 'Нет связи с сервером'}>
                 <i /> {live ? 'хранилище синхронизировано' : 'нет связи'}
               </span>

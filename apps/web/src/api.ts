@@ -41,7 +41,7 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new ApiError(0, 'Сервер Frame OS недоступен. Проверьте, что он запущен (npm run dev или npm start).');
+    throw new ApiError(0, 'Сервер «Лёгкость ОС» недоступен. Проверьте, что он запущен (npm run dev или npm start).');
   }
   let data: unknown = null;
   try {

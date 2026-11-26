@@ -85,7 +85,7 @@ try {
   const shot = async (name) => shots && page.screenshot({ path: path.join(shots, `${name}.png`), fullPage: true });
   const expectText = async (text, timeout = 5000) => page.getByText(text, { exact: false }).first().waitFor({ timeout });
 
-  console.log('Frame OS e2e');
+  console.log('Лёгкость ОС: e2e');
 
   await step('Главная показывает данные из vault', async () => {
     await page.goto(base);
@@ -103,24 +103,24 @@ try {
   await step('Быстрый ввод создаёт задачу на сегодня в ежедневной заметке', async () => {
     await page.keyboard.press('n');
     await page.getByRole('dialog', { name: 'Быстрый ввод' }).waitFor();
-    await page.getByLabel('Текст').fill('E2E: проверить Frame OS сегодня');
+    await page.getByLabel('Текст').fill('E2E: проверить Лёгкость сегодня');
     await page.keyboard.press('Enter');
     await expectText('сохранена в');
     await page.goto(`${base}/today`);
-    await expectText('E2E: проверить Frame OS');
+    await expectText('E2E: проверить Лёгкость');
     const today = (await (await fetch(`${base}/api/health`)).json()).today;
     const raw = await fs.readFile(path.join(vault, 'Daily', `${today}.md`), 'utf8');
-    if (!raw.includes(`- [ ] E2E: проверить Frame OS 📅 ${today}`)) throw new Error('Задача не записана в Markdown');
+    if (!raw.includes(`- [ ] E2E: проверить Лёгкость 📅 ${today}`)) throw new Error('Задача не записана в Markdown');
     await shot('today');
   });
 
   await step('Задача отмечается выполненной и пишет ✅ в файл', async () => {
-    const item = page.locator('li.task', { hasText: 'E2E: проверить Frame OS' }).first();
+    const item = page.locator('li.task', { hasText: 'E2E: проверить Лёгкость' }).first();
     await item.getByRole('button', { name: 'Отметить выполненной' }).click();
-    await page.locator('li.task.done', { hasText: 'E2E: проверить Frame OS' }).first().waitFor();
+    await page.locator('li.task.done', { hasText: 'E2E: проверить Лёгкость' }).first().waitFor();
     const today = (await (await fetch(`${base}/api/health`)).json()).today;
     const raw = await fs.readFile(path.join(vault, 'Daily', `${today}.md`), 'utf8');
-    if (!raw.includes(`- [x] E2E: проверить Frame OS 📅 ${today} ✅ ${today}`)) throw new Error('В файле нет отметки выполнения');
+    if (!raw.includes(`- [x] E2E: проверить Лёгкость 📅 ${today} ✅ ${today}`)) throw new Error('В файле нет отметки выполнения');
   });
 
   await step('Вечерний итог сохраняется в секцию заметки', async () => {

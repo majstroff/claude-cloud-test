@@ -58,7 +58,7 @@ export const USER_MESSAGES: Record<TodoistErrorCode, string> = {
   rate_limited: "Слишком много запросов к Todoist. Синхронизация повторится автоматически.",
   server: "Todoist временно недоступен. Изменения сохранены и будут отправлены позже.",
   network: "Нет связи с Todoist. Изменения сохранены локально и будут отправлены позже.",
-  conflict: "Задача изменилась и в Frame OS, и в Todoist. Выберите, какую версию оставить.",
+  conflict: "Задача изменилась и в «Лёгкости», и в Todoist. Выберите, какую версию оставить.",
   confirmation_required: "Это действие нужно подтвердить.",
   unexpected: "Неожиданная ошибка Todoist.",
 };

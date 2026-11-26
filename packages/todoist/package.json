@@ -2,7 +2,7 @@
   "name": "@frame-os/todoist",
   "version": "0.1.0",
   "private": true,
-  "description": "Frame OS: Todoist API v1 client and two-way sync",
+  "description": "Лёгкость ОС: Todoist API v1 client and two-way sync",
   "type": "module",
   "main": "./src/index.ts",
   "exports": {

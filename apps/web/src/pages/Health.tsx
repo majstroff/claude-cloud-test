@@ -173,7 +173,7 @@ export function HealthPage() {
           </section>
           <div className="notice">
             <Info size={18} style={{ flex: '0 0 auto' }} />
-            <div className="small">Frame OS только ведёт записи и показывает динамику. Это не медицинская оценка: диагнозов и назначений раздел не даёт.</div>
+            <div className="small">«Лёгкость» только ведёт записи и показывает динамику. Это не медицинская оценка: диагнозов и назначений раздел не даёт.</div>
           </div>
         </div>
       </div>
