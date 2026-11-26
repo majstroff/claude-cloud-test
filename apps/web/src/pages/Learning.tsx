@@ -34,7 +34,7 @@ export function ProgressForm({ item }: { item: LearningItemDTO }) {
       <button className="btn small" type="submit" disabled={m.isPending || !v.trim()}>
         Отметить
       </button>
-      <button type="button" className="btn small ghost" onClick={() => m.mutate({ path: item.path, status: 'done' })} disabled={m.isPending}>
+      <button type="button" className="btn small ghost" style={{ whiteSpace: 'nowrap' }} onClick={() => m.mutate({ path: item.path, status: 'done' })} disabled={m.isPending}>
         Готово
       </button>
     </form>

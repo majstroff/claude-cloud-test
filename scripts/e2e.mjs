@@ -284,6 +284,98 @@ try {
     await expectText('Задача, добавленная в Obsidian', 8000);
   });
 
+  const todayDate = async () => (await (await fetch(`${base}/api/health`)).json()).today;
+  const readVault = (rel) => fs.readFile(path.join(vault, rel), 'utf8');
+
+  await step('Главная и «Сегодня» показывают платежи, тренировки и регулярные дела', async () => {
+    await page.goto(base);
+    await expectText('Платежи на 7 дней');
+    await expectText('Тренировки сегодня');
+    await expectText('Регулярное на сегодня');
+    await page.goto(`${base}/today`);
+    await expectText('Регулярное, тренировки и платежи');
+  });
+
+  await step('Финансы: операция записывается в таблицу месяца', async () => {
+    await page.goto(`${base}/finance`);
+    await page.getByRole('tab', { name: 'Операции' }).click();
+    await page.getByLabel('Сумма', { exact: true }).fill('1234');
+    await page.getByLabel('Категория', { exact: true }).fill('Продукты');
+    await page.getByLabel('Описание', { exact: true }).fill('E2E покупка');
+    await page.getByRole('button', { name: 'Записать' }).click();
+    await expectText('E2E покупка');
+    const month = (await todayDate()).slice(0, 7);
+    const raw = await readVault(`Areas/Финансы/Операции/${month}.md`);
+    if (!/\| Продукты \| E2E покупка \|/.test(raw)) throw new Error('Операция не записана');
+    await shot('finance');
+  });
+
+  await step('Финансы: оплата подписки переносит дату следующего платежа', async () => {
+    const before = await readVault('Areas/Финансы/Подписки/Яндекс Плюс.md');
+    const next = before.match(/next_payment: (\S+)/)[1];
+    await page.goto(`${base}/finance`);
+    await page.getByRole('button', { name: 'Оплачено: Яндекс Плюс' }).first().click();
+    await expectText('Оплата записана');
+    const after = await readVault('Areas/Финансы/Подписки/Яндекс Плюс.md');
+    const moved = after.match(/next_payment: (\S+)/)[1];
+    if (!(moved > next)) throw new Error(`Дата не перенесена: ${next} → ${moved}`);
+  });
+
+  await step('Здоровье: тренировка отмечается выполненной, показатели дня сохраняются', async () => {
+    await page.goto(`${base}/health`);
+    await page.getByRole('button', { name: /Выполнено: .*Силовая А/ }).first().click();
+    await expectText('Тренировка отмечена выполненной');
+    const w = await readVault('Areas/Здоровье/Тренировки/2026-11-24 Силовая А.md');
+    if (!/status: done/.test(w)) throw new Error('Статус не записан');
+    await page.getByLabel('Вода, л').fill('1,5');
+    await page.getByRole('button', { name: 'Сохранить показатели' }).click();
+    await expectText('Показатели записаны');
+    const daily = await readVault(`Daily/${await todayDate()}.md`);
+    if (!/water: 1\.5/.test(daily)) throw new Error('Вода не записана в ежедневную заметку');
+    await shot('health');
+  });
+
+  await step('Регулярное дело отмечается сделанным', async () => {
+    await page.getByRole('button', { name: 'Сделано: Витамин D' }).first().click();
+    await expectText('сегодня ✓');
+    const r = await readVault('Areas/Здоровье/Регулярное/Витамин D.md');
+    if (!r.includes(`last_done: ${await todayDate()}`)) throw new Error('last_done не обновлён');
+  });
+
+  await step('Обучение: прогресс книги сохраняется', async () => {
+    await page.goto(`${base}/learning`);
+    await page.getByLabel('Прогресс: Inspired').fill('180');
+    await page.getByLabel('Прогресс: Inspired').press('Enter');
+    await expectText('180');
+    const b = await readVault('Resources/Обучение/Книги/Inspired.md');
+    if (!/progress: 180/.test(b)) throw new Error('Прогресс не записан');
+    await shot('learning');
+  });
+
+  await step('Практики: запись попадает в ежедневную заметку', async () => {
+    await page.goto(`${base}/practices`);
+    await page.getByLabel('Минут').fill('15');
+    await page.getByLabel('Комментарий к практике').fill('E2E дыхание');
+    await page.getByRole('button', { name: 'Записать', exact: true }).click();
+    await expectText('Практика записана');
+    const daily = await readVault(`Daily/${await todayDate()}.md`);
+    if (!/## Практики[\s\S]*15 мин[\s\S]*E2E дыхание/.test(daily)) throw new Error('Практика не записана');
+    await shot('practices');
+  });
+
+  await step('Дом: покупка с ценой отмечается и пишет расход в финансы', async () => {
+    await page.goto(`${base}/home`);
+    await page.getByLabel('Цена: Лампочки E27 ×4').fill('560');
+    await page.getByRole('button', { name: 'Куплено: Лампочки E27 ×4' }).click();
+    await expectText('расход записан');
+    const list = await readVault('Areas/Дом/Покупки.md');
+    if (!list.includes('- [x] Лампочки E27 ×4')) throw new Error('Покупка не отмечена');
+    const month = (await todayDate()).slice(0, 7);
+    const ledger = await readVault(`Areas/Финансы/Операции/${month}.md`);
+    if (!ledger.includes('Лампочки E27')) throw new Error('Расход не записан в операции');
+    await shot('house');
+  });
+
   await step('Тёмная тема и мобильная ширина', async () => {
     await page.goto(base);
     await page.getByRole('button', { name: 'Сменить тему' }).click();
@@ -294,8 +386,16 @@ try {
     await page.goto(base);
     await page.getByRole('heading', { name: 'Главная' }).waitFor();
     await page.locator('li.task').first().waitFor();
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
-    if (overflow) throw new Error('Горизонтальная прокрутка на мобильной ширине');
+    const overflow = await page.evaluate(() => {
+      const w = window.innerWidth;
+      if (document.documentElement.scrollWidth <= w + 1) return null;
+      return [...document.querySelectorAll('body *')]
+        .filter((e) => e.getBoundingClientRect().right > w + 1)
+        .slice(-3)
+        .map((e) => `${e.tagName.toLowerCase()}.${e.className}: ${(e.textContent ?? '').slice(0, 40)}`)
+        .join('; ');
+    });
+    if (overflow) throw new Error(`Горизонтальная прокрутка на мобильной ширине: ${overflow}`);
     await shot('home-mobile');
   });
 

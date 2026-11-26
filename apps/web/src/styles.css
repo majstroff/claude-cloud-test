@@ -318,7 +318,7 @@ label.field { display: grid; gap: 6px; font-size: 12px; color: var(--text-2); }
 .phases .ph.on { color: #fff; }
 
 .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.list li > a, .list li > div.li {
+.list li > a, .list li > div.li, .list li > form.li {
   display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 12px;
 }
 .list li > a:hover { background: var(--surface-2); }
@@ -451,3 +451,8 @@ label.field { display: grid; gap: 6px; font-size: 12px; color: var(--text-2); }
   .rail svg { width: 16px; height: 16px; }
 }
 .progress.red > div { background: var(--red); }
+/* На узком экране чипы и кнопки строки переносятся под название, а не выходят за край. */
+@media (max-width: 640px) {
+  .list li > div.li, .list li > form.li { flex-wrap: wrap; }
+  .list li > div.li .li-main, .list li > form.li .li-main { flex-basis: calc(100% - 20px); }
+}
