@@ -11,8 +11,10 @@ const KEY = 'frame-shell';
 export function detectShell(): boolean {
   try {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('shell') === 'mac') {
-      sessionStorage.setItem(KEY, 'mac');
+    const shell = params.get('shell');
+    if (shell) {
+      // native — своя программа на WebKit: она сама открывает внешние ссылки в браузере.
+      if (shell === 'mac') sessionStorage.setItem(KEY, 'mac');
       params.delete('shell');
       const q = params.toString();
       window.history.replaceState(window.history.state, '', window.location.pathname + (q ? `?${q}` : '') + window.location.hash);
