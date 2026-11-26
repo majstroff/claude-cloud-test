@@ -25,6 +25,9 @@ const FOLDER_LABELS: Array<[keyof FolderConfig, string]> = [
   ['learning', 'Чтение и обучение'],
   ['practices', 'Практики'],
   ['home', 'Дом'],
+  ['knowledge', 'Знания (заметки, инструкции, исследования, ссылки)'],
+  ['travel', 'Путешествия'],
+  ['relationships', 'Отношения (важные даты)'],
 ];
 
 export function SettingsPage() {

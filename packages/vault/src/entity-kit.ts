@@ -30,6 +30,8 @@ export type FieldKind =
   | 'boolean'
   | 'last4'
   | 'docnumber'
+  /** Ежегодная дата: ГГГГ-ММ-ДД или ММ-ДД, если год неизвестен (день рождения, годовщина). */
+  | 'monthday'
   | { enum: readonly string[] };
 
 /** Ссылка на заметку или просто текст, если такой заметки нет. */
@@ -98,6 +100,11 @@ export function normalizeFieldValue(kind: FieldKind, value: unknown, label: stri
         throw new VaultError('Поле «Номер»: только буквы, цифры, пробелы, дефис, точка, «/» и «№», до 40 символов', 'invalid');
       }
       return s.replace(/\s+/g, ' ');
+    case 'monthday': {
+      const a = parseAnniversary(s);
+      if (!a) throw new VaultError(`Поле «${label}»: дата в формате ГГГГ-ММ-ДД, ДД.ММ.ГГГГ или ДД.ММ, если год неизвестен`, 'invalid');
+      return a.year ? `${a.year}-${a.md}` : a.md;
+    }
     case 'link':
       return linkOrText(s);
     default:
@@ -308,4 +315,40 @@ export function parseDatedLines(text: string): Array<{ date: string; text: strin
     if (m && isIsoDate(m[1])) out.push({ date: m[1]!, text: m[2]!.trim() });
   }
   return out.map((e, i) => ({ e, i })).sort((a, b) => b.e.date.localeCompare(a.e.date) || b.i - a.i).map((x) => x.e);
+}
+
+/**
+ * Ежегодная дата: «1990-03-15», «03-15», «15.03.1990», «15.03».
+ * Год может быть неизвестен — тогда возраст и «сколько лет» не считаются.
+ */
+export function parseAnniversary(v: unknown): { year: number | null; md: string } | null {
+  if (v instanceof Date && !Number.isNaN(v.getTime())) v = v.toISOString().slice(0, 10);
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  let y: number | null = null;
+  let m: number;
+  let d: number;
+  let r: RegExpExecArray | null;
+  if ((r = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s))) [y, m, d] = [Number(r[1]), Number(r[2]), Number(r[3])];
+  else if ((r = /^-{0,2}(\d{2})-(\d{2})$/.exec(s))) [m, d] = [Number(r[1]), Number(r[2])];
+  else if ((r = /^(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?$/.exec(s))) [d, m, y] = [Number(r[1]), Number(r[2]), r[3] ? Number(r[3]) : null];
+  else return null;
+  if (m < 1 || m > 12 || d < 1) return null;
+  const maxDay = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1]!;
+  if (d > maxDay) return null;
+  if (y !== null && (y < 1900 || y > 2200)) return null;
+  if (y !== null && m === 2 && d === 29 && !isLeap(y)) return null;
+  return { year: y, md: `${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` };
+}
+
+export function isLeap(y: number): boolean {
+  return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+}
+
+/** Ближайшее наступление ежегодной даты не раньше from (29 февраля в невисокосный год — 28-го). */
+export function nextOccurrence(md: string, from: string): string {
+  const year = Number(from.slice(0, 4));
+  const at = (y: number) => (md === '02-29' && !isLeap(y) ? `${y}-02-28` : `${y}-${md}`);
+  const cur = at(year);
+  return cur >= from ? cur : at(year + 1);
 }

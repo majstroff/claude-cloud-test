@@ -36,6 +36,19 @@ export class Life {
 
   constructor(readonly vault: Vault) {}
 
+  /** Типы заметок, даты которых показывает в календаре свой модуль (например, ежегодные даты). */
+  private calendarOwnTypes = new Set<string>();
+  /** Задачи-чек-листы (вещи в поездку), которые не нужно показывать в бэклоге. */
+  private backlogExclusions: Array<(t: VaultTask, note: Note) => boolean> = [];
+
+  ownCalendarType(type: string): void {
+    this.calendarOwnTypes.add(type);
+  }
+
+  excludeFromBacklog(fn: (t: VaultTask, note: Note) => boolean): void {
+    this.backlogExclusions.push(fn);
+  }
+
   /** Модули (работа, контакты, документы…) добавляют свои даты в общий календарь. */
   addCalendarSource(fn: CalendarSource): void {
     this.calendarSources.push(fn);
@@ -99,6 +112,12 @@ export class Life {
       case 'backlog':
         // Отправленные в Todoist задачи ведутся там и в бэклоге Obsidian не показываются.
         list = list.filter((t) => isOpen(t) && effectiveDate(t) === null && !t.start && !t.todoistId);
+        if (this.backlogExclusions.length) {
+          list = list.filter((t) => {
+            const n = this.vault.get(t.path);
+            return !n || !this.backlogExclusions.some((fn) => fn(t, n));
+          });
+        }
         break;
       case 'done':
         list = list.filter((t) => t.status === 'done' && t.doneDate === today);
@@ -494,7 +513,7 @@ export class Life {
         if (dl) push(dl, { kind: 'deadline', title: `Срок: ${n.title}`, path: n.path, noteType: n.type });
         continue;
       }
-      if (n.type === 'daily') continue;
+      if (n.type === 'daily' || this.calendarOwnTypes.has(n.type)) continue;
       // Пропущенные тренировки и отменённые события в календаре не показываем.
       if (fm.status === 'skipped' || fm.status === 'cancelled') continue;
       if (isIsoDate(fm.date)) {

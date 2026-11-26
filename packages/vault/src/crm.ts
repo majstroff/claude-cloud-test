@@ -68,7 +68,7 @@ const SENSITIVE_DOC_TYPES: DocType[] = ['passport', 'residence', 'visa', 'contra
 export type EntityType = 'vacancy' | 'company' | 'contact' | 'document' | 'resume' | 'portfolio';
 export const ENTITY_TYPES: EntityType[] = ['vacancy', 'company', 'contact', 'document', 'resume', 'portfolio'];
 
-type FieldKind = 'text' | 'date' | 'time' | 'url' | 'email' | 'phone' | 'number' | 'link' | 'list' | 'boolean' | 'last4' | 'docnumber' | { enum: readonly string[] };
+type FieldKind = 'text' | 'date' | 'time' | 'url' | 'email' | 'phone' | 'number' | 'link' | 'list' | 'boolean' | 'last4' | 'docnumber' | 'monthday' | { enum: readonly string[] };
 
 /** Какие свойства можно задавать через интерфейс и как их проверять. */
 export const ENTITY_FIELDS: Record<EntityType, Record<string, FieldKind>> = {
@@ -110,6 +110,8 @@ export const ENTITY_FIELDS: Record<EntityType, Record<string, FieldKind>> = {
     last_contact: 'date',
     next_contact: 'date',
     project: 'link',
+    birthday: 'monthday',
+    contact_every: 'number',
   },
   document: {
     doc_type: { enum: DOC_TYPES },
@@ -134,7 +136,7 @@ const FIELD_LABEL: Record<string, string> = {
   interview_time: 'Время собеседования', test_due: 'Срок тестового', next_step: 'Следующий шаг', next_date: 'Дата шага',
   result: 'Результат', project: 'Проект', kind: 'Вид', website: 'Сайт', industry: 'Отрасль', city: 'Город', role: 'Должность',
   client_status: 'Статус клиента', phone: 'Телефон', email: 'Email', links: 'Ссылки', last_contact: 'Последняя связь',
-  next_contact: 'Следующий контакт', doc_type: 'Тип документа', owner: 'Владелец', storage: 'Где хранится',
+  next_contact: 'Следующий контакт', birthday: 'День рождения', contact_every: 'Связываться раз в, дней', doc_type: 'Тип документа', owner: 'Владелец', storage: 'Где хранится',
   number: 'Номер', number_last4: 'Последние символы номера', issued: 'Дата выдачи', expires: 'Действует до', remind_days: 'Напомнить за, дней',
   organization: 'Организация', sensitive: 'Конфиденциально', version: 'Версия', updated: 'Обновлено',
 };

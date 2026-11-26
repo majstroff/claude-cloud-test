@@ -9,6 +9,7 @@ import { MonthCalendar } from '../components/Calendar.tsx';
 import { TodoistPanel } from '../components/Todoist.tsx';
 import { ObligationList, RoutineList } from '../components/Spheres.tsx';
 import { WorkoutLine } from './Health.tsx';
+import { NextTripCard, OccasionLine, TouchButton, dueLabel } from '../components/Personal.tsx';
 import { Empty, ErrorBox, Loading, Progress, TYPE_LABEL, plural, relDate } from '../components/ui.tsx';
 
 export function HomePage() {
@@ -130,6 +131,7 @@ export function HomePage() {
         <div className="stack">
           <CycleHero cycle={d.cycle} />
           <RemindersCard d={d} />
+          <NextTripCard t={d.spheres.nextTrip} today={d.today} />
           <section className="card">
             <div className="card-head">
               <h2 className="card-title">
@@ -201,7 +203,9 @@ function LifeCard({ d }: { d: Dashboard }) {
 function RemindersCard({ d }: { d: Dashboard }) {
   const r = d.reminders;
   const warranties = d.spheres.warranties;
-  const total = r.followUps.length + r.documents.length + r.interviews.length + warranties.length;
+  const occasions = d.spheres.occasions;
+  const due = d.spheres.contactsDue;
+  const total = r.followUps.length + r.documents.length + r.interviews.length + warranties.length + occasions.length + due.length;
   return (
     <section className="card">
       <div className="card-head">
@@ -213,9 +217,26 @@ function RemindersCard({ d }: { d: Dashboard }) {
         </Link>
       </div>
       {total === 0 ? (
-        <Empty title="Ничего не горит">Здесь появятся контакты, с которыми пора связаться, документы на продление и собеседования.</Empty>
+        <Empty title="Ничего не горит">Здесь появятся дни рождения, контакты, с которыми пора связаться, документы на продление и собеседования.</Empty>
       ) : (
         <ul className="list">
+          {occasions.map((o) => (
+            <li key={o.key}>
+              <OccasionLine o={o} today={d.today} />
+            </li>
+          ))}
+          {due.map((p) => (
+            <li key={p.path}>
+              <div className="li">
+                <span className="type-dot contact" />
+                <Link to={entityHref('contact', p.path)} className="li-main">
+                  <div className="li-title">Написать: {p.title}</div>
+                  <div className="li-sub" style={{ color: p.dueState === 'overdue' ? 'var(--red)' : undefined }}>{dueLabel(p, d.today)}</div>
+                </Link>
+                <TouchButton path={p.path} title={p.title} />
+              </div>
+            </li>
+          ))}
           {r.interviews.map((v) => (
             <li key={v.path}>
               <Link to={entityHref('vacancy', v.path)}>

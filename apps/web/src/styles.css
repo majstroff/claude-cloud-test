@@ -422,6 +422,17 @@ label.field { display: grid; gap: 6px; font-size: 12px; color: var(--text-2); }
 .type-dot.book, .type-dot.article, .type-dot.video, .type-dot.course, .type-dot.skill { background: var(--violet); }
 .type-dot.appliance, .type-dot.shopping, .type-dot.chores { background: var(--amber); }
 .type-dot.routine { background: var(--blue); }
+.type-dot.instruction, .type-dot.research, .type-dot.bookmark { background: var(--violet); }
+.type-dot.trip, .type-dot.booking { background: var(--blue); }
+.type-dot.important_date { background: var(--accent); }
+.tag-cloud { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-cloud button.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.snippet { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+.snippet mark { background: color-mix(in srgb, var(--amber) 35%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+.check-row { display: flex; align-items: center; gap: 8px; }
+.level-error { color: var(--red); }
+.level-warning { color: var(--amber); }
+.level-ok { color: var(--green); }
 .money { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .money.plus { color: var(--green); }
 .money.minus { color: var(--text); }

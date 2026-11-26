@@ -8,6 +8,8 @@ import { MonthCalendar, useCalendar } from '../components/Calendar.tsx';
 import { TodoistPanel } from '../components/Todoist.tsx';
 import { MoonBadge, ObligationList, RoutineList } from '../components/Spheres.tsx';
 import { WorkoutLine } from './Health.tsx';
+import { OccasionLine, TripLine, bookingWhen } from '../components/Personal.tsx';
+import { entityHref } from '../entities.ts';
 import type { SpheresDay } from '../api.ts';
 import { Empty, ErrorBox, Loading, WEEKDAYS_SHORT, addDaysIso, fmtDate, noteHref, parseIso, useToast } from '../components/ui.tsx';
 
@@ -213,7 +215,7 @@ function DayExtras({ date, today }: { date: string; today: string }) {
   return (
     <section className="card">
       <div className="card-head">
-        <h2 className="card-title">Регулярное, тренировки и платежи</h2>
+        <h2 className="card-title">Регулярное, даты, поездки и платежи</h2>
         <span className="row small muted" style={{ gap: 8 }}>
           <MoonBadge moon={x.moon} />
           {x.moon.phaseLabel}, {x.moon.lunarDay}-й лунный день
@@ -248,7 +250,43 @@ function DayExtras({ date, today }: { date: string; today: string }) {
           <RoutineList routines={x.routines} today={today} showSphere />
         </>
       )}
-      {x.obligations.length === 0 && x.workouts.length === 0 && x.routines.length === 0 && (
+      {x.occasions.length > 0 && (
+        <>
+          <div className="small muted" style={{ margin: '10px 8px 4px' }}>Важные даты</div>
+          <ul className="list">
+            {x.occasions.map((o) => (
+              <li key={o.key}>
+                <OccasionLine o={o} today={today} />
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {(x.travel.trips.length > 0 || x.travel.bookings.length > 0) && (
+        <>
+          <div className="small muted" style={{ margin: '10px 8px 4px' }}>Путешествия</div>
+          <ul className="list">
+            {x.travel.trips.map((t) => (
+              <li key={t.path}>
+                <TripLine t={t} today={today} />
+              </li>
+            ))}
+            {x.travel.bookings.map((b) => (
+              <li key={b.path}>
+                <Link to={entityHref('booking', b.path)}>
+                  <span className="type-dot booking" />
+                  <span className="li-main">
+                    <div className="li-title">{b.endDate === date && b.date !== date ? `Выезд: ${b.title}` : b.title}</div>
+                    <div className="li-sub">{[bookingWhen(b), b.place, b.confirmation ? `код ${b.confirmation}` : null].filter(Boolean).join(' · ')}</div>
+                  </span>
+                  {!b.paid && b.cost ? <span className="chip amber">не оплачено</span> : null}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {x.obligations.length === 0 && x.workouts.length === 0 && x.routines.length === 0 && x.occasions.length === 0 && x.travel.trips.length === 0 && x.travel.bookings.length === 0 && (
         <Empty title="Ни платежей, ни тренировок, ни регулярных дел на этот день" />
       )}
       <div className="small muted" style={{ margin: '12px 8px 0' }}>

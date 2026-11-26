@@ -9,6 +9,9 @@ import { Household } from './household.ts';
 import { Learning } from './learning.ts';
 import { Practices, moonPhase } from './practices.ts';
 import { Routines } from './routines.ts';
+import { Knowledge } from './knowledge.ts';
+import { Travel } from './travel.ts';
+import { Relationships } from './relationships.ts';
 import type { EntityModule } from './entity-kit.ts';
 import type { Life } from './life.ts';
 
@@ -19,6 +22,9 @@ export class Spheres {
   readonly learning: Learning;
   readonly practices: Practices;
   readonly home: Household;
+  readonly knowledge: Knowledge;
+  readonly travel: Travel;
+  readonly relations: Relationships;
 
   constructor(readonly life: Life) {
     this.routines = new Routines(life);
@@ -27,11 +33,14 @@ export class Spheres {
     this.learning = new Learning(life);
     this.practices = new Practices(life);
     this.home = new Household(life, this.finance, this.routines);
+    this.knowledge = new Knowledge(life);
+    this.travel = new Travel(life, this.finance);
+    this.relations = new Relationships(life, this.finance);
   }
 
   /** Модули, которые создают и меняют записи через общие /api/entities и /api/entity. */
   get owners(): EntityModule[] {
-    return [this.routines, this.finance, this.health, this.learning, this.home];
+    return [this.routines, this.finance, this.health, this.learning, this.home, this.knowledge, this.travel, this.relations];
   }
 
   ownerOf(type: string): EntityModule | null {
@@ -50,6 +59,8 @@ export class Spheres {
       routinesDue: this.routines.dueToday(),
       warranties: this.home.reminders().warranties,
       learningActive: this.learning.items().filter((i) => i.status === 'active').slice(0, 3),
+      nextTrip: this.travel.next(),
+      ...this.relations.reminders(),
     };
   }
 
@@ -70,6 +81,8 @@ export class Spheres {
       practices: this.practices.day(date),
       health: this.health.dayHealth(date),
       moon: moonPhase(date),
+      travel: this.travel.day(date),
+      occasions: this.relations.day(date).occasions,
       tomorrowObligations: isToday ? this.finance.obligations(addDays(date, 1)).filter((o) => o.date === addDays(date, 1)) : [],
     };
   }

@@ -3,6 +3,9 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BookOpen,
+  BookMarked,
+  Heart,
+  Plane,
   Briefcase,
   Dumbbell,
   Flower2,
@@ -43,6 +46,9 @@ const NAV = [
   { to: '/learning', label: 'Чтение и обучение', icon: BookOpen },
   { to: '/practices', label: 'Практики', icon: Flower2 },
   { to: '/home', label: 'Дом', icon: House },
+  { to: '/knowledge', label: 'Знания', icon: BookMarked },
+  { to: '/travel', label: 'Путешествия', icon: Plane },
+  { to: '/relationships', label: 'Отношения', icon: Heart, badge: 'occasions' as const },
 ];
 
 const TITLES: Record<string, string> = {
@@ -65,6 +71,11 @@ const TITLES: Record<string, string> = {
   '/learning': 'Чтение и обучение',
   '/practices': 'Практики',
   '/home': 'Дом',
+  '/knowledge': 'Знания',
+  '/knowledge/view': 'Знания',
+  '/travel': 'Путешествия',
+  '/travel/view': 'Поездка',
+  '/relationships': 'Отношения',
   '/item': 'Запись',
   '/note': 'Заметка',
   '/favorites': 'Избранное',
@@ -105,6 +116,7 @@ export function Layout() {
     followups: dash.data?.reminders?.followUps.filter((c) => c.followUp !== 'soon').length ?? 0,
     documents: dash.data?.reminders?.documents.length ?? 0,
     payments: dash.data?.spheres?.obligationsOverdue ?? 0,
+    occasions: (dash.data?.spheres?.occasions?.filter((o) => o.daysLeft <= 3).length ?? 0) + (dash.data?.spheres?.contactsDue?.filter((p) => p.dueState === 'overdue').length ?? 0),
   };
   const nextTheme = theme === 'system' ? 'dark' : theme === 'dark' ? 'light' : 'system';
 

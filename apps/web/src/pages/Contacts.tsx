@@ -8,6 +8,7 @@ import { CreateEntityModal, EditEntityCard, HistoryList, RefLink, RelatedCard, S
 import { Empty, ErrorBox, Loading, fmtDate, noteHref, plural, relDate, useToast } from '../components/ui.tsx';
 import { COMPANY_FIELDS, COMPANY_KIND_LABEL, CONTACT_FIELDS, CONTACT_KIND_LABEL, RELATION_STATUS_LABEL, entityHref } from '../entities.ts';
 import { VacancyStatusChip } from './Work.tsx';
+import { PersonRelationsCard } from '../components/Personal.tsx';
 
 type ContactsData = { today: string; contacts: ContactDTO[]; companies: CompanyDTO[] };
 
@@ -315,6 +316,8 @@ export function ContactPage() {
             </div>
             {c.agreements.length === 0 ? <Empty title="Договорённостей нет">Добавьте их при записи общения.</Empty> : <TaskList tasks={c.agreements} today={today} showSource={false} />}
           </section>
+
+          <PersonRelationsCard path={c.path} today={today} />
 
           <section className="card">
             <h3 className="card-title" style={{ marginBottom: 8 }}>Задачи</h3>

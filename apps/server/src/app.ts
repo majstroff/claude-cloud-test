@@ -20,6 +20,7 @@ import {
 import { StateStore } from './state.ts';
 import { registerCrmRoutes } from './crm-routes.ts';
 import { registerSpheresRoutes } from './spheres-routes.ts';
+import { registerPersonalRoutes } from './personal-routes.ts';
 import { KNOWN_INTEGRATIONS, registerIntegrations, type IntegrationStatus } from './integrations.ts';
 
 export interface AppOptions {
@@ -56,6 +57,7 @@ const TASK_VIEWS: TaskView[] = ['today', 'overdue', 'upcoming', 'backlog', 'done
 const FOLDER_KEYS: Array<keyof FolderConfig> = [
   'projects', 'areas', 'resources', 'archive', 'goals', 'cycles', 'ideas', 'inbox', 'daily', 'events',
   'work', 'contacts', 'companies', 'documents', 'finance', 'health', 'learning', 'practices', 'home',
+  'knowledge', 'travel', 'relationships',
 ];
 
 export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { vault: Vault; life: Life; crm: Crm; spheres: Spheres }> {
@@ -429,6 +431,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance & { va
 
   registerCrmRoutes(app, crm, spheres);
   registerSpheresRoutes(app, spheres);
+  registerPersonalRoutes(app, spheres, crm);
 
   app.all('/api/*', async (req, reply) => reply.code(404).send({ error: `Нет такого метода API: ${req.method} ${req.url.split('?')[0]}` }));
 
