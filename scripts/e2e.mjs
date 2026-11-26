@@ -293,7 +293,7 @@ try {
     await expectText('Тренировки сегодня');
     await expectText('Регулярное на сегодня');
     await page.goto(`${base}/today`);
-    await expectText('Регулярное, тренировки и платежи');
+    await expectText('Регулярное, даты, поездки и платежи');
   });
 
   await step('Финансы: операция записывается в таблицу месяца', async () => {
@@ -374,6 +374,66 @@ try {
     const ledger = await readVault(`Areas/Финансы/Операции/${month}.md`);
     if (!ledger.includes('Лампочки E27')) throw new Error('Расход не записан в операции');
     await shot('house');
+  });
+
+  await step('Главная показывает ближайший день рождения и поездку', async () => {
+    await page.goto(base);
+    await expectText('Ближайшая поездка');
+    await expectText('Тбилиси — декабрь 2026');
+    await expectText('День рождения: Ольга Иванова');
+  });
+
+  await step('Знания: поиск и заметка для висячей ссылки', async () => {
+    await page.goto(`${base}/knowledge`);
+    await page.getByLabel('Поиск по знаниям').fill('резервная копия');
+    await expectText('Резервная копия хранилища');
+    await page.getByLabel('Поиск по знаниям').fill('');
+    await page.getByRole('button', { name: 'Создать заметку: North Star Metric' }).first().click();
+    await expectText('Заметка создана');
+    await page.getByRole('heading', { name: 'North Star Metric' }).waitFor();
+    const n = await readVault('Resources/Знания/North Star Metric.md');
+    if (!n.includes('Ссылаются: [[Метрики продукта]]')) throw new Error('Заметка не создана');
+    await shot('knowledge');
+  });
+
+  await step('Знания: связь между заметками пишется в секцию «Связи»', async () => {
+    await page.goto(`${base}/knowledge/view?path=${encodeURIComponent('Resources/Знания/Инструкции/Резервная копия хранилища.md')}`);
+    await page.getByLabel('Связать с заметкой').fill('Метрики');
+    await page.getByRole('button', { name: 'Добавить ссылку: Метрики продукта' }).click();
+    await expectText('Ссылка добавлена');
+    const n = await readVault('Resources/Знания/Инструкции/Резервная копия хранилища.md');
+    if (!/## Связи\n- \[\[Метрики продукта\]\]/.test(n)) throw new Error('Ссылка не записана');
+  });
+
+  await step('Путешествия: оплата брони и список вещей', async () => {
+    await page.goto(`${base}/travel`);
+    await page.getByRole('link', { name: /Тбилиси — декабрь 2026/ }).first().click();
+    await page.getByRole('heading', { name: 'Тбилиси — декабрь 2026' }).waitFor();
+    await page.getByRole('button', { name: 'Оплачено: Перелёт Москва — Тбилиси' }).click();
+    await expectText('расход записан');
+    const b = await readVault('Areas/Путешествия/Брони/Перелёт Москва — Тбилиси.md');
+    if (!/paid: true/.test(b)) throw new Error('Бронь не отмечена');
+    const month = (await todayDate()).slice(0, 7);
+    if (!(await readVault(`Areas/Финансы/Операции/${month}.md`)).includes('Перелёт Москва — Тбилиси')) throw new Error('Расход не записан');
+    await page.getByRole('button', { name: '+ Базовый' }).click();
+    await expectText('Добавлено пунктов');
+    if (!(await readVault('Areas/Путешествия/Тбилиси — декабрь 2026.md')).includes('- [ ] Пауэрбанк')) throw new Error('Вещи не добавлены');
+    await shot('trip');
+  });
+
+  await step('Отношения: «Связались» и идея подарка', async () => {
+    await page.goto(`${base}/relationships`);
+    await expectText('Годовщина свадьбы');
+    await page.getByRole('button', { name: 'Связались: Ольга Иванова' }).click();
+    await expectText('Записано');
+    const o = await readVault('Resources/Контакты/Ольга Иванова.md');
+    if (!o.includes(`last_contact: ${await todayDate()}`)) throw new Error('Дата связи не записана');
+    await shot('relationships');
+    await page.goto(`${base}/contacts/view?path=${encodeURIComponent('Resources/Контакты/Мама.md')}`);
+    await page.getByLabel('Идея подарка').fill('Тёплый плед');
+    await page.getByRole('button', { name: 'Идея', exact: true }).click();
+    await expectText('Идея подарка записана');
+    if (!(await readVault('Resources/Контакты/Мама.md')).includes('- Тёплый плед')) throw new Error('Идея не записана');
   });
 
   await step('Тёмная тема и мобильная ширина', async () => {

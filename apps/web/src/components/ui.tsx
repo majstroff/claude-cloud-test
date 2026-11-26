@@ -190,6 +190,12 @@ export const TYPE_LABEL: Record<string, string> = {
   routine: 'Регулярное',
   shopping: 'Покупки',
   chores: 'Бытовые дела',
+  instruction: 'Инструкция',
+  research: 'Исследование',
+  bookmark: 'Ссылка',
+  trip: 'Поездка',
+  booking: 'Бронь',
+  important_date: 'Важная дата',
 };
 
 export const STATUS_LABEL: Record<string, string> = {

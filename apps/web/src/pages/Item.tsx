@@ -5,6 +5,8 @@ import { ArrowLeft, Check, Copy, FileText, Plus } from 'lucide-react';
 import {
   api,
   type ApplianceDetail,
+  type BookingDetail,
+  type DateDetail,
   type FinanceItem,
   type LearningDetail,
   type NoteData,
@@ -33,6 +35,8 @@ import {
   rub,
 } from '../entities.ts';
 import { ProgressForm } from './Learning.tsx';
+import { GiftsCard, bookingWhen, inDays } from '../components/Personal.tsx';
+import { BOOKING_KIND_LABEL, DATE_KIND_LABEL } from '../entities.ts';
 
 const BACK: Record<string, [string, string]> = {
   subscription: ['/finance?tab=regular', 'Финансы'],
@@ -46,6 +50,9 @@ const BACK: Record<string, [string, string]> = {
   course: ['/learning', 'Чтение и обучение'],
   skill: ['/learning?tab=skills', 'Чтение и обучение'],
   appliance: ['/home', 'Дом'],
+  booking: ['/travel', 'Путешествия'],
+  important_date: ['/relationships', 'Отношения'],
+  birthday: ['/relationships', 'Отношения'],
 };
 
 /** Страница записи разделов «Финансы», «Здоровье», «Обучение», «Дом» и регулярных дел. */
@@ -77,6 +84,11 @@ export function ItemPage() {
         return <ApplianceView path={path} />;
       case 'routine':
         return <RoutineView path={path} />;
+      case 'booking':
+        return <BookingView path={path} />;
+      case 'important_date':
+      case 'birthday':
+        return <DateView path={path} />;
       default:
         return (
           <Empty title="Эта заметка открывается в общем просмотре" action={<Link className="btn small" to={noteHref(path)}>Открыть заметку</Link>} />
@@ -674,6 +686,139 @@ function RoutineView({ path }: { path: string }) {
             <HistoryList items={r.history} empty="Ещё ни разу не отмечено" />
           </section>
           <SectionEditor path={path} section="notes" title="Заметки" value={r.notes} />
+        </Shell>
+      )}
+    />
+  );
+}
+
+// ---------- Бронь ----------
+
+function BookingView({ path }: { path: string }) {
+  const pay = useAct<{ transaction: unknown }>('/api/travel/pay', (r) => (r.transaction ? 'Оплачено, расход записан в «Финансы»' : 'Отмечено как оплаченное'));
+  const [amount, setAmount] = useState('');
+  return (
+    <Loaded<BookingDetail>
+      url={`/api/travel/booking?path=${encodeURIComponent(path)}`}
+      keyName={['booking', path]}
+      render={(b) => (
+        <Shell
+          path={path}
+          type="booking"
+          title={b.title}
+          sub={
+            <>
+              {BOOKING_KIND_LABEL[b.kind]} · поездка: <RefLink r={b.trip} type="trip" />
+            </>
+          }
+          chips={<span className={`chip ${b.paid ? 'green' : 'amber'}`}>{b.paid ? 'оплачено' : 'не оплачено'}</span>}
+          side={<RelatedCard related={b.related} emptyHint="Бронь связана с поездкой через свойство «Поездка»." />}
+        >
+          <section className="card">
+            <Stats
+              items={[
+                ['Когда', bookingWhen(b)],
+                ['Где', b.place ?? '—'],
+                ['Кто продаёт', b.provider ?? '—'],
+                ['Код брони', b.confirmation ?? '—'],
+                ['Стоимость', <Money value={b.cost} />],
+              ]}
+            />
+            {b.url && (
+              <div className="small" style={{ marginTop: 10 }}>
+                <a href={b.url} target="_blank" rel="noreferrer noopener">
+                  {b.url}
+                </a>
+              </div>
+            )}
+            {!b.paid && (
+              <form
+                className="inline-form"
+                style={{ marginTop: 12 }}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  pay.mutate({ path, amount: amount || null });
+                }}
+              >
+                <input className="input" style={{ width: 130 }} inputMode="decimal" placeholder={b.cost ? String(b.cost) : 'Сумма, ₽'} value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="Сумма оплаты" />
+                <button className="btn small primary" type="submit" disabled={pay.isPending}>
+                  <Check size={14} /> Оплачено
+                </button>
+                <span className="small muted">расход «Путешествия» попадёт в «Финансы»</span>
+              </form>
+            )}
+          </section>
+          {b.transactions.length > 0 && (
+            <section className="card">
+              <h3 className="card-title" style={{ marginBottom: 8 }}>Оплаты</h3>
+              <ul className="list">
+                {b.transactions.map((t) => (
+                  <li key={`${t.path}:${t.line}`}>
+                    <div className="li">
+                      <span className="li-main">
+                        <div className="li-title">{t.description}</div>
+                        <div className="li-sub">{fmtDate(t.date)}</div>
+                      </span>
+                      <Money value={t.amount} sign="minus" />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          <SectionEditor path={path} section="notes" title="Заметки" value={b.notes} />
+        </Shell>
+      )}
+    />
+  );
+}
+
+// ---------- Важная дата ----------
+
+function DateView({ path }: { path: string }) {
+  const health = useQuery({ queryKey: ['health'], queryFn: () => api.get<{ today: string }>('/api/health') });
+  const today = health.data?.today ?? '';
+  return (
+    <Loaded<DateDetail>
+      url={`/api/relationships/date?path=${encodeURIComponent(path)}`}
+      keyName={['important-date', path]}
+      render={(d) => (
+        <Shell
+          path={path}
+          type={d.kind === 'birthday' ? 'birthday' : 'important_date'}
+          title={d.title}
+          sub={
+            <>
+              {DATE_KIND_LABEL[d.kind]}
+              {d.person && (
+                <>
+                  {' · '}
+                  <RefLink r={d.person} type="contact" />
+                </>
+              )}
+            </>
+          }
+          chips={d.occasion ? <span className={`chip ${d.occasion.remind ? 'amber' : ''}`}>{inDays(d.occasion.daysLeft)}</span> : <span className="chip">прошла</span>}
+          side={<RelatedCard related={d.related} emptyHint="Свяжите дату с человеком через свойство «Человек»." />}
+        >
+          <section className="card">
+            <Stats
+              items={[
+                ['Дата', d.date ?? '—'],
+                ['Ближайшая', d.occasion ? relDate(d.occasion.next, today) : '—'],
+                ['Сколько лет', d.occasion?.years ? String(d.occasion.years) : '—'],
+                ['Повтор', d.yearly ? 'каждый год' : 'один раз'],
+              ]}
+            />
+            {d.occasion?.remind && <div className="small" style={{ marginTop: 10, color: 'var(--amber)' }}>Скоро — самое время подумать о подарке и планах.</div>}
+          </section>
+          <GiftsCard path={path} ideas={d.ideas} given={d.given} person={d.person?.title ?? d.title} />
+          <section className="card">
+            <h3 className="card-title" style={{ marginBottom: 8 }}>Задачи</h3>
+            {d.tasks.length === 0 ? <Empty title="Задач нет" /> : <TaskList tasks={d.tasks} today={today} showSource={false} />}
+            <AddTaskInline path={path} placeholder="Например: забронировать столик" />
+          </section>
+          <SectionEditor path={path} section="notes" title="Заметки" value={d.notes} />
         </Shell>
       )}
     />

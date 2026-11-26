@@ -13,4 +13,7 @@ export * from './health.ts';
 export * from './learning.ts';
 export * from './practices.ts';
 export * from './household.ts';
+export * from './knowledge.ts';
+export * from './travel.ts';
+export * from './relationships.ts';
 export * from './spheres.ts';

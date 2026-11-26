@@ -83,6 +83,12 @@ export interface FolderConfig {
   practices: string;
   /** Дом: техника, покупки, бытовые дела. */
   home: string;
+  /** Знания: заметки, инструкции, исследования, ссылки. */
+  knowledge: string;
+  /** Путешествия: поездки и брони. */
+  travel: string;
+  /** Отношения: важные даты и близкие люди. */
+  relationships: string;
   /** Формат имени файла ежедневной заметки (поддерживаются YYYY, MM, DD). */
   dailyFormat: string;
   dailyTemplate: string | null;
@@ -327,6 +333,9 @@ export class Vault {
       learning: byBase(/^(learning|study|обучение|чтение|чтение и обучение)$/i, `${resources}/Обучение`),
       practices: byBase(/^(practices?|практики)$/i, `${areas}/Практики`),
       home: byBase(/^(home|house|household|дом|быт)$/i, `${areas}/Дом`),
+      knowledge: byBase(/^(knowledge|knowledge base|wiki|знания|база знаний)$/i, `${resources}/Знания`),
+      travel: byBase(/^(travel|travels|trips|путешествия|поездки)$/i, `${areas}/Путешествия`),
+      relationships: byBase(/^(relationships|relations|отношения|близкие)$/i, `${areas}/Отношения`),
       daily,
       dailyFormat,
       dailyTemplate,

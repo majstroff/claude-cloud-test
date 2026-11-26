@@ -98,6 +98,8 @@ export const CONTACT_FIELDS: FieldDef[] = [
   { key: 'links', label: 'Ссылки (по одной в строке)', kind: 'list', wide: true },
   { key: 'last_contact', label: 'Последняя связь', kind: 'date' },
   { key: 'next_contact', label: 'Следующий контакт', kind: 'date' },
+  { key: 'birthday', label: 'День рождения', kind: 'text', placeholder: '1990-03-15 или 15.03', hint: 'Год можно не указывать' },
+  { key: 'contact_every', label: 'Связываться раз в, дней', kind: 'number', placeholder: '30' },
   { key: 'project', label: 'Проект', kind: 'link', linkTypes: ['project'] },
 ];
 
@@ -263,8 +265,68 @@ export const ROUTINE_FIELDS: FieldDef[] = [
   { key: 'status', label: 'Статус', kind: 'select', options: { active: 'Активно', paused: 'На паузе' } },
 ];
 
+// ---------- Знания, путешествия, отношения ----------
+
+export const KNOWLEDGE_TYPE_LABEL: Record<string, string> = { note: 'Заметка', instruction: 'Инструкция', research: 'Исследование', bookmark: 'Ссылка' };
+export const KNOWLEDGE_STATUS_LABEL: Record<string, string> = { draft: 'Черновик', active: 'В работе', done: 'Готово', outdated: 'Устарело' };
+export const PARA_LABEL: Record<string, string> = { projects: 'Проекты', areas: 'Сферы', resources: 'Ресурсы', archive: 'Архив', none: 'Вне PARA' };
+export const TRIP_STATUS_LABEL: Record<string, string> = { idea: 'Идея', planning: 'Планирую', booked: 'Забронировано', done: 'Завершена', cancelled: 'Отменена' };
+export const TRIP_PHASE_LABEL: Record<string, string> = { ...TRIP_STATUS_LABEL, ongoing: 'В поездке' };
+export const BOOKING_KIND_LABEL: Record<string, string> = {
+  flight: 'Перелёт', train: 'Поезд', bus: 'Автобус', hotel: 'Отель', apartment: 'Апартаменты', car: 'Аренда авто',
+  transfer: 'Трансфер', tour: 'Экскурсия', insurance: 'Страховка', event: 'Билет на событие', other: 'Другое',
+};
+export const DATE_KIND_LABEL: Record<string, string> = { birthday: 'День рождения', anniversary: 'Годовщина', memorial: 'Памятная дата', holiday: 'Праздник', other: 'Другое' };
+
+const KNOWLEDGE_BASE: FieldDef[] = [
+  { key: 'topic', label: 'Тема', kind: 'text' },
+  { key: 'tags', label: 'Теги (через запятую или по строке)', kind: 'list', wide: true },
+  { key: 'project', label: 'Проект', kind: 'link', linkTypes: ['project'] },
+  { key: 'area', label: 'Сфера', kind: 'text' },
+];
+export const KNOWLEDGE_FIELDS: Record<string, FieldDef[]> = {
+  note: [...KNOWLEDGE_BASE, { key: 'status', label: 'Статус', kind: 'select', options: KNOWLEDGE_STATUS_LABEL }, { key: 'source', label: 'Источник (ссылка)', kind: 'url', placeholder: 'https://…' }, { key: 'goal', label: 'Цель', kind: 'link', linkTypes: ['goal'] }],
+  instruction: [...KNOWLEDGE_BASE, { key: 'status', label: 'Статус', kind: 'select', options: KNOWLEDGE_STATUS_LABEL }, { key: 'reviewed', label: 'Проверено', kind: 'date', hint: 'Когда инструкция последний раз была актуальной' }, { key: 'source', label: 'Источник (ссылка)', kind: 'url', placeholder: 'https://…' }],
+  research: [{ key: 'question', label: 'Вопрос исследования', kind: 'text', wide: true }, ...KNOWLEDGE_BASE, { key: 'status', label: 'Статус', kind: 'select', options: KNOWLEDGE_STATUS_LABEL }, { key: 'goal', label: 'Цель', kind: 'link', linkTypes: ['goal'] }],
+  bookmark: [{ key: 'url', label: 'Адрес', kind: 'url', placeholder: 'https://…', wide: true }, { key: 'why', label: 'Зачем сохранил', kind: 'text', wide: true }, ...KNOWLEDGE_BASE, { key: 'read', label: 'Прочитано', kind: 'boolean' }],
+};
+
+export const TRIP_FIELDS: FieldDef[] = [
+  { key: 'destination', label: 'Куда', kind: 'text', placeholder: 'Город, страна' },
+  { key: 'status', label: 'Статус', kind: 'select', options: TRIP_STATUS_LABEL },
+  { key: 'start', label: 'Начало', kind: 'date' },
+  { key: 'end', label: 'Конец', kind: 'date' },
+  { key: 'budget', label: 'Бюджет, ₽', kind: 'number' },
+  { key: 'travelers', label: 'Кто едет (по строке)', kind: 'list' },
+  { key: 'documents', label: 'Документы (названия заметок, по строке)', kind: 'list', hint: 'Например: Паспорт. Проверяется только срок действия' },
+  { key: 'project', label: 'Проект', kind: 'link', linkTypes: ['project'] },
+  { key: 'goal', label: 'Цель', kind: 'link', linkTypes: ['goal'] },
+];
+
+export const BOOKING_FIELDS: FieldDef[] = [
+  { key: 'trip', label: 'Поездка', kind: 'link', linkTypes: ['trip'] },
+  { key: 'kind', label: 'Вид', kind: 'select', options: BOOKING_KIND_LABEL },
+  { key: 'date', label: 'Дата', kind: 'date' },
+  { key: 'time', label: 'Время', kind: 'time' },
+  { key: 'end_date', label: 'До (выезд, возврат)', kind: 'date' },
+  { key: 'place', label: 'Откуда — куда / адрес', kind: 'text', wide: true },
+  { key: 'provider', label: 'Перевозчик / сервис', kind: 'text' },
+  { key: 'confirmation', label: 'Код брони', kind: 'text' },
+  { key: 'cost', label: 'Стоимость, ₽', kind: 'number' },
+  { key: 'paid', label: 'Оплачено', kind: 'boolean' },
+  { key: 'url', label: 'Ссылка', kind: 'url', placeholder: 'https://…' },
+];
+
+export const DATE_FIELDS: FieldDef[] = [
+  { key: 'date', label: 'Дата', kind: 'text', placeholder: '2019-12-07 или 07.12', hint: 'Год можно не указывать' },
+  { key: 'kind', label: 'Вид', kind: 'select', options: DATE_KIND_LABEL },
+  { key: 'person', label: 'Человек', kind: 'link', linkTypes: ['contact'] },
+  { key: 'yearly', label: 'Каждый год', kind: 'boolean' },
+  { key: 'remind_days', label: 'Напомнить за, дней', kind: 'number', placeholder: '7' },
+];
+
 /** Типы записей, которые открываются на общей странице записи раздела. */
-export const SPHERE_ITEM_TYPES = ['subscription', 'payment', 'debt', 'savings', 'workout', 'book', 'article', 'video', 'course', 'skill', 'appliance', 'routine'];
+export const SPHERE_ITEM_TYPES = ['subscription', 'payment', 'debt', 'savings', 'workout', 'book', 'article', 'video', 'course', 'skill', 'appliance', 'routine', 'booking', 'important_date', 'birthday'];
 
 export function fieldsFor(type: string): FieldDef[] {
   switch (type) {
@@ -289,6 +351,18 @@ export function fieldsFor(type: string): FieldDef[] {
       return APPLIANCE_FIELDS;
     case 'routine':
       return ROUTINE_FIELDS;
+    case 'trip':
+      return TRIP_FIELDS;
+    case 'booking':
+      return BOOKING_FIELDS;
+    case 'important_date':
+    case 'birthday':
+      return DATE_FIELDS;
+    case 'note':
+    case 'instruction':
+    case 'research':
+    case 'bookmark':
+      return KNOWLEDGE_FIELDS[type]!;
     default:
       return [];
   }
@@ -316,6 +390,12 @@ export function entityHref(type: string, path: string): string {
     case 'shopping':
     case 'chores':
       return '/home';
+    case 'trip':
+      return `/travel/view?path=${p}`;
+    case 'instruction':
+    case 'research':
+    case 'bookmark':
+      return `/knowledge/view?path=${p}`;
     default:
       if (SPHERE_ITEM_TYPES.includes(type)) return `/item?path=${p}`;
       return `/note?path=${p}`;

@@ -234,3 +234,18 @@ export type ApplianceDetail = ReturnType<Household['applianceDetail']>;
 export type RoutineDetail = ReturnType<Routines['detail']>;
 export type SpheresDashboard = ReturnType<Spheres['dashboard']>;
 export type SpheresDay = ReturnType<Spheres['day']>;
+
+// ---------- Знания, путешествия, отношения ----------
+
+import type { Knowledge, Travel, Relationships } from '@frame-os/vault';
+export type { KnowledgeItemDTO, TripDTO, BookingDTO, OccasionDTO, PersonDTO } from '@frame-os/vault';
+
+export type KnowledgeData = ReturnType<Knowledge['overview']>;
+export type KnowledgeDetail = ReturnType<Knowledge['detail']>;
+export type KnowledgeHit = ReturnType<Knowledge['search']>[number];
+export type TravelData = ReturnType<Travel['overview']>;
+export type TripDetail = ReturnType<Travel['tripDetail']>;
+export type BookingDetail = ReturnType<Travel['bookingDetail']>;
+export type RelationsData = ReturnType<Relationships['overview']>;
+export type DateDetail = ReturnType<Relationships['dateDetail']>;
+export type PersonDetail = ReturnType<Relationships['personDetail']>;
