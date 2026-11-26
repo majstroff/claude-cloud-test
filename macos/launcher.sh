@@ -3,6 +3,7 @@
 #   launcher.sh start   — запустить сервер (если ещё не запущен) и дождаться готовности
 #   launcher.sh open    — открыть окно приложения; печатает app или browser
 #   launcher.sh window  — состояние окна: yes / closed / waiting
+#   launcher.sh windows — для проверки: процесс окна, число окон и потоков
 #   launcher.sh stop    — закрыть окно и остановить сервер, если его запускала программа
 #
 # Папка установки: ~/Documents/Frame OS (app, Vault, .frame-data).
@@ -97,6 +98,12 @@ activate_pid() {
   osascript -l JavaScript -e "ObjC.import('AppKit'); var a = \$.NSRunningApplication.runningApplicationWithProcessIdentifier($1); a.isNil() ? 'no' : (a.activateWithOptions(3) ? 'ok' : 'no')" 2>/dev/null
 }
 
+# Сколько обычных окон у процесса (через CoreGraphics, без особых разрешений).
+# Свёрнутые окна и окна на других рабочих столах тоже считаются.
+window_count() {
+  osascript -l JavaScript -e "ObjC.import('CoreGraphics'); var l = ObjC.deepUnwrap(ObjC.castRefToObject(\$.CGWindowListCopyWindowInfo(16, 0))) || []; l.filter(function (w) { return w.kCGWindowOwnerPID == $1 && w.kCGWindowLayer == 0 && w.kCGWindowBounds && w.kCGWindowBounds.Height > 150 && w.kCGWindowBounds.Width > 150; }).length" 2>/dev/null
+}
+
 # Важно: всегда запускаем браузер с отдельным профилем (open -n … --user-data-dir).
 # Команда «open -a "Google Chrome"» без профиля открыла бы обычный Chrome пользователя.
 open_window() {
@@ -119,9 +126,10 @@ open_window() {
 }
 
 # Окно считается открытым, пока интерфейс держит поток событий сервера.
-# Закрыто — когда окно уже было и потоков нет три проверки подряд (перезагрузка страницы не считается).
+# Если потоков нет (страница грузится или перезагружается), но окно программы на экране есть —
+# тоже открыто. Закрыто — когда окно уже было, а теперь нет ни потоков, ни окна две проверки подряд.
 window_state() {
-  local clients
+  local clients pid count n
   clients=$(clients)
   if [ -z "$clients" ]; then
     # Сервер не отвечает — значит, его остановили.
@@ -131,14 +139,24 @@ window_state() {
   if [ "$clients" -gt 0 ]; then
     echo 0 >"$STATE"
     echo yes
-  elif [ -f "$STATE" ]; then
-    local n
-    n=$(( $(cat "$STATE" 2>/dev/null || echo 0) + 1 ))
-    echo "$n" >"$STATE"
-    if [ "$n" -ge 3 ]; then echo closed; else echo yes; fi
-  else
-    echo waiting
+    return
   fi
+  if [ ! -f "$STATE" ]; then
+    echo waiting
+    return
+  fi
+  pid=$(window_pid)
+  count=0
+  [ -n "$pid" ] && count=$(window_count "$pid")
+  if [ "${count:-0}" -gt 0 ]; then
+    echo 0 >"$STATE"
+    echo yes
+    return
+  fi
+  n=$(( $(cat "$STATE" 2>/dev/null || echo 0) + 1 ))
+  echo "$n" >"$STATE"
+  echo "$(date '+%F %T') нет окна и потоков (проверка $n), процесс окна: ${pid:-нет}" >>"$DATA_DIR/app-window.log"
+  if [ "$n" -ge 2 ]; then echo closed; else echo yes; fi
 }
 
 stop() {
@@ -164,5 +182,6 @@ case "$1" in
   window) window_state ;;
   stop) stop ;;
   status) if healthy; then echo running; else echo stopped; fi ;;
-  *) echo "Использование: $0 start|open|window|stop|status" >&2; exit 2 ;;
+  windows) p=$(window_pid); if [ -n "$p" ]; then echo "pid=$p windows=$(window_count "$p") clients=$(clients)"; else echo "нет окна"; fi ;;
+  *) echo "Использование: $0 start|open|window|stop|status|windows" >&2; exit 2 ;;
 esac
